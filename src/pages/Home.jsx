@@ -279,7 +279,7 @@ function ServicePillars() {
                       to={`/services/${service.slug}`}
                       onMouseEnter={() => setActive(index)}
                       onFocus={() => setActive(index)}
-                      className="group relative flex items-center gap-6 rounded-2xl px-5 py-5"
+                      className="group relative flex items-center gap-4 rounded-2xl px-4 py-5 sm:gap-6 sm:px-5"
                     >
                       {isActive && (
                         <motion.span
@@ -288,7 +288,7 @@ function ServicePillars() {
                           transition={{ type: "spring", stiffness: 400, damping: 34 }}
                         />
                       )}
-                      <span className={`relative font-display text-3xl font-bold transition-colors ${isActive ? "text-orange" : "text-white/25"}`}>
+                      <span className={`relative font-display text-2xl font-bold transition-colors sm:text-3xl ${isActive ? "text-orange" : "text-white/25"}`}>
                         {String(index + 1).padStart(2, "0")}
                       </span>
                       <div className="relative flex-1">

@@ -3,6 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { useLanguage } from "../i18n/context";
 import LanguageSwitcher from "./LanguageSwitcher";
+import { languages } from "../i18n/translations";
 
 function Logo() {
   return (
@@ -16,7 +17,7 @@ function Logo() {
 }
 
 export default function Navbar() {
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { scrollY } = useScroll();
@@ -67,7 +68,9 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <LanguageSwitcher />
+            <div className="hidden md:block">
+              <LanguageSwitcher />
+            </div>
             <Link
               to="/contact"
               className="group hidden items-center gap-3 rounded-full bg-navy py-1.5 pl-5 pr-1.5 text-sm font-semibold text-white transition-colors hover:bg-navy-light md:flex"
@@ -96,7 +99,7 @@ export default function Navbar() {
         {open && (
           <motion.div
             id="mobile-menu"
-            className="fixed inset-0 z-50 flex flex-col bg-navy px-6 pb-10 pt-5 text-white md:hidden"
+            className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-navy px-6 pb-8 pt-5 text-white md:hidden"
             initial={{ clipPath: "circle(0% at 100% 0%)" }}
             animate={{ clipPath: "circle(150% at 100% 0%)" }}
             exit={{ clipPath: "circle(0% at 100% 0%)" }}
@@ -130,7 +133,28 @@ export default function Navbar() {
                 </motion.div>
               ))}
             </nav>
-            <div className="mt-auto space-y-4">
+            <div className="mt-auto space-y-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/40">{t.nav.language}</p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {languages.map((language) => {
+                    const active = language.code === lang;
+                    return (
+                      <button
+                        key={language.code}
+                        type="button"
+                        lang={language.code}
+                        aria-pressed={active}
+                        onClick={() => setLang(language.code)}
+                        className={`min-w-0 rounded-2xl border px-2.5 py-3 text-left transition-colors ${active ? "border-orange bg-orange text-navy" : "border-white/15 text-white hover:border-white/40"}`}
+                      >
+                        <span className="block text-[10px] font-bold tracking-widest opacity-60">{language.short}</span>
+                        <span className="block text-xs font-semibold">{language.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <a href="mailto:contact@jdmining.rw" className="block text-white/70">
                 contact@jdmining.rw
               </a>
