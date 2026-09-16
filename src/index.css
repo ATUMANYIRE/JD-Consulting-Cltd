@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy: #0E293E;
+  --color-navy-light: #163550;
+  --color-orange: #E28A2E;
+  --color-orange-light: #EA9534;
+  --color-paper: #ffffff;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-cage: cage 5s ease-in-out infinite;
+  --animate-haul: haul 4s ease-in-out infinite alternate;
+  --animate-orbit: spin 28s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes cage {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(118px); }
+}
+
+@keyframes haul {
+  from { transform: translateX(0); }
+  to { transform: translateX(30px); }
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-navy);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+:root {
+  --cursor-mountain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M12 3 L27 28 H1 Z' fill='%230E293E' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M21 13 L31 28 H15 Z' fill='%23E28A2E' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M12 3 L16.2 10 L14 9 L12 11 L10 9 L7.8 10 Z' fill='white'/%3E%3C/svg%3E") 12 3, auto;
+  --cursor-pick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 32 32'%3E%3Cpath d='M23 27 L11 12' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M23 27 L11 12' stroke='%236b4526' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M22 5 Q10 3 3 14' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M22 5 Q10 3 3 14' fill='none' stroke='%230E293E' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M22 5 Q10 3 3 14' fill='none' stroke='%23E28A2E' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 3 9, pointer;
+}
+
+html,
+body {
+  cursor: var(--cursor-mountain);
+}
+
+a,
+button,
+select,
+label,
+summary,
+[role="button"],
+[role="option"],
+.cursor-pick,
+.cursor-pick * {
+  cursor: var(--cursor-pick);
+}
+
+input,
+textarea {
+  cursor: text;
+}
