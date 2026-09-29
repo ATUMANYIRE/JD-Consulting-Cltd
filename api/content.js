@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve as resolvePath, sep } from "node:path";
 import { validateProjects, validateUpdates } from "../src/data/schema.js";
 
 // Backend for the owner's private /admin editor (a Vercel serverless function). Each save becomes one
@@ -128,7 +128,12 @@ function github({ token, repo, branch, fetchImpl }) {
 // The same interface over the local working copy, for trying the editor under `npm run dev`
 // (see vite.config.js). A "commit" just writes the files; nothing is pushed anywhere.
 export function localRepo(root) {
-  const full = (path) => `${root}/${path}`;
+  const base = resolvePath(root);
+  const full = (path) => {
+    const target = resolvePath(base, path);
+    if (!target.startsWith(base + sep)) throw new HttpError(400, "Invalid file path.");
+    return target;
+  };
   return {
     async head() {
       return "local";

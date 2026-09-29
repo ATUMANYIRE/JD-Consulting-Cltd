@@ -29,6 +29,10 @@ function checkDate(report, field, value, required = true) {
 function checkMedia(report, item, fileExists) {
   if (!item) return;
   if (!item.src) return report(`a photo/video entry has no "src"`);
+  // Only files under /media/ (plain names, no "..") or https:// addresses, so a path can never reach other files.
+  if (!/^\/media\/[a-z0-9-]+\/[a-z0-9][a-z0-9._-]*\.(jpe?g|png|webp|mp4|webm)$/i.test(item.src) || item.src.includes("..")) {
+    if (!/^https:\/\/[^\s"<>]+$/.test(item.src)) return report(`"${item.src}" must be a file in public/media/ (e.g. "/media/projects/site-visit.jpg") or an https:// address`);
+  }
   if (item.type && !["image", "video"].includes(item.type)) report(`media type must be "image" or "video" (got "${item.type}")`);
   if (fileExists && item.src.startsWith("/") && !fileExists(item.src)) report(`file not found: public${item.src}`);
   if ((item.type ?? "image") === "image" && !item.alt) report(`image ${item.src} needs an "alt" description`);
