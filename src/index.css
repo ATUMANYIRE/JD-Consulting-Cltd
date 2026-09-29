@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Short laptop screens: the home hero tightens so everything fits above the fold. */
+@custom-variant short (@media (max-height: 820px));
+@custom-variant tiny (@media (max-height: 640px));
+
 @theme {
   --color-navy: #0E293E;
   --color-navy-light: #163550;
@@ -43,28 +47,50 @@ h3 {
 }
 
 :root {
+  /* Default: a small mountain. Over interactive elements: a rock drill (hotspot on the bit tip). */
   --cursor-mountain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M12 3 L27 28 H1 Z' fill='%230E293E' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M21 13 L31 28 H15 Z' fill='%23E28A2E' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M12 3 L16.2 10 L14 9 L12 11 L10 9 L7.8 10 Z' fill='white'/%3E%3C/svg%3E") 12 3, auto;
-  --cursor-pick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 32 32'%3E%3Cpath d='M23 27 L11 12' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M23 27 L11 12' stroke='%236b4526' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M22 5 Q10 3 3 14' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M22 5 Q10 3 3 14' fill='none' stroke='%230E293E' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M22 5 Q10 3 3 14' fill='none' stroke='%23E28A2E' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 3 9, pointer;
+  --cursor-tool: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 32 32'%3E%3Cpath d='M5 5 L16 16' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M5 5 L16 16' stroke='%238c99a3' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M16 16 L25 25' stroke='white' stroke-width='11' stroke-linecap='round'/%3E%3Cpath d='M16 16 L25 25' stroke='%230E293E' stroke-width='8' stroke-linecap='round'/%3E%3Cpath d='M17.6 23.4 L23.4 17.6' stroke='%23E28A2E' stroke-width='2.6'/%3E%3Cpath d='M24.5 30 L30 24.5' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M24.5 30 L30 24.5' stroke='%230E293E' stroke-width='2.6' stroke-linecap='round'/%3E%3Ccircle cx='4.5' cy='4.5' r='3' fill='%23E28A2E' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E") 3 3, pointer;
 }
 
-html,
-body {
-  cursor: var(--cursor-mountain);
+/* Custom cursors only for mouse/trackpad users; touch devices keep native behaviour. */
+@media (pointer: fine) {
+  html,
+  body {
+    cursor: var(--cursor-mountain);
+  }
+
+  a,
+  button,
+  select,
+  label,
+  summary,
+  [role="button"],
+  [role="option"],
+  .cursor-tool,
+  .cursor-tool * {
+    cursor: var(--cursor-tool);
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
+  }
+
+  :disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
-a,
-button,
-select,
-label,
-summary,
-[role="button"],
-[role="option"],
-.cursor-pick,
-.cursor-pick * {
-  cursor: var(--cursor-pick);
+/* In the base layer so a component can opt out with Tailwind utilities (e.g. the chat input). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-orange);
+    outline-offset: 3px;
+  }
 }
 
-input,
-textarea {
-  cursor: text;
+::selection {
+  background: rgba(226, 138, 46, 0.3);
 }

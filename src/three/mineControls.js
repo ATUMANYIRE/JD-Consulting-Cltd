@@ -1,5 +1,5 @@
 export const mineControls = {
-  strike: false,
+  boost: false,
   burst: null,
   flash: 0,
   shake: 0,

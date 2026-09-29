@@ -3,6 +3,10 @@ import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useLanguage, useServices } from "../i18n/context";
 import { mulberry32 } from "../three/geometry";
+import Logo from "./Logo";
+import Placeholder from "./Placeholder";
+import { WhatsAppIcon } from "./icons";
+import { company, phoneHref, whatsappHref } from "../data/company";
 
 const WIDTH = 1440;
 const HEIGHT = 320;
@@ -107,7 +111,11 @@ export default function Footer() {
   const pages = [
     { to: "/", label: t.nav.home },
     { to: "/about", label: t.nav.about },
+    { to: "/mandate", label: t.nav.mandate },
     { to: "/services", label: t.nav.services },
+    { to: "/updates", label: t.nav.updates },
+    { to: "/projects", label: t.nav.projects },
+    { to: "/careers", label: t.nav.careers },
     { to: "/contact", label: t.nav.contact },
   ];
 
@@ -129,13 +137,15 @@ export default function Footer() {
 
           <div className="grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1.5fr_1.2fr]">
             <div>
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-white font-display text-lg font-bold text-navy">
-                <span>
-                  JD<span className="text-orange">.</span>
-                </span>
-              </span>
-              <p className="mt-4 text-sm font-semibold uppercase tracking-[0.2em] text-white/50">{t.footer.legalName}</p>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/60">{t.footer.tagline}</p>
+              <Logo tone="white" size="lg" showName={false} />
+              <div className="mt-4 border-l-2 border-orange pl-3">
+                <p className="font-display text-base font-bold">{company.name}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/50">
+                  {t.footer.tin}
+                  {company.tin ? <span className="text-white/80">{company.tin}</span> : <Placeholder tone="dark" className="normal-case tracking-normal" />}
+                </p>
+              </div>
+              <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">{t.footer.tagline}</p>
             </div>
 
             <div>
@@ -166,16 +176,28 @@ export default function Footer() {
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-orange">{t.footer.reach}</p>
-              <a href="mailto:contact@jdmining.rw" className="mt-4 block break-all font-display text-lg font-semibold transition-colors hover:text-orange">
-                contact@jdmining.rw
+              <a href={`mailto:${company.email}`} className="mt-4 block break-all font-display text-lg font-semibold transition-colors hover:text-orange">
+                {company.email}
               </a>
-              <p className="mt-1 text-sm text-white/60">{t.contact.region}</p>
+              <a href={phoneHref} className="mt-2 block text-sm text-white/80 transition-colors hover:text-orange">
+                {company.phone}
+              </a>
+              <a
+                href={whatsappHref()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 px-3.5 py-1.5 text-xs font-semibold text-white/80 transition-colors hover:border-[#25D366] hover:text-white"
+              >
+                <WhatsAppIcon className="h-4 w-4 text-[#25D366]" />
+                WhatsApp
+              </a>
+              <p className="mt-3 text-sm text-white/60">{t.contact.region}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 py-6 text-xs text-white/40">
             <span>
-              © {new Date().getFullYear()} JD Mining Consulting Ltd. {t.footer.rights}
+              © {new Date().getFullYear()} {company.legalName}. {t.footer.rights}
             </span>
             <span className="hidden sm:inline">{t.footer.sectors}</span>
             <button

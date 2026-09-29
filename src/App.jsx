@@ -3,15 +3,18 @@ import { Outlet, useLocation } from "react-router-dom";
 import { MotionConfig, motion, useScroll, useSpring } from "framer-motion";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import SupportChat from "./components/SupportChat";
 
 export default function App() {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const { scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 24 });
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    const target = hash && document.getElementById(hash.slice(1));
+    if (target) target.scrollIntoView();
+    else window.scrollTo(0, 0);
+  }, [pathname, hash]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -32,6 +35,7 @@ export default function App() {
         </motion.main>
         <Footer />
       </div>
+      <SupportChat />
     </MotionConfig>
   );
 }

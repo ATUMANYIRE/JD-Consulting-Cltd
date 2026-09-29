@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { animate, AnimatePresence, motion, useInView, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { Reveal, Stagger, TiltCard } from "../components/motion";
 import NavyPattern from "../components/NavyPattern";
+import VisionMission from "../components/VisionMission";
 import { staggerItem } from "../components/variants";
 import { mineControls } from "../three/mineControls";
 import { ServiceIllustration } from "../components/illustrations";
@@ -98,12 +99,12 @@ function Hero() {
   }
 
   function handlePointerDown(event) {
-    if (!event.target.closest("a, button")) mineControls.strike = true;
+    if (!event.target.closest("a, button")) mineControls.boost = true;
   }
 
   return (
     <section ref={sectionRef} onPointerMove={handlePointerMove} onPointerDown={handlePointerDown} className="relative h-[420vh] bg-navy text-white">
-      <div className="cursor-pick sticky top-0 isolate h-[100svh] overflow-hidden">
+      <div className="cursor-tool sticky top-[72px] isolate h-[calc(100svh-72px)] overflow-hidden">
         <motion.div
           className="absolute inset-0"
           role="img"
@@ -127,14 +128,14 @@ function Hero() {
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(5,14,22,0.9)_100%)]"
         />
 
-        <div className="pointer-events-none relative mx-auto flex h-full max-w-6xl flex-col justify-end px-4 pb-24 pt-32 sm:px-6 md:justify-center md:pb-10">
+        <div className="pointer-events-none relative mx-auto flex h-full max-w-6xl flex-col justify-end px-4 pb-24 pt-10 sm:px-6 md:justify-center md:pb-24 tiny:md:pb-16">
           <motion.div key={t.hero.eyebrow} style={{ opacity: introOpacity, y: introY, scale: introScale }} className={`max-w-xl origin-left ${stage === 0 ? "" : "invisible"}`}>
             <motion.div className="flex items-center gap-3" initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
               <span className="h-2 w-10 rounded-full bg-gradient-to-r from-orange to-orange-light" />
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange-light">{t.hero.eyebrow}</p>
             </motion.div>
 
-            <h1 className="mt-5 font-display text-4xl font-bold leading-[1.1] tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)] sm:text-5xl">
+            <h1 className="mt-5 font-display text-4xl font-bold leading-[1.1] tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)] sm:text-5xl short:mt-3 short:sm:text-[2.6rem] tiny:sm:text-4xl">
               {t.hero.lines.map((line, i) => (
                 <span key={line.text} className="block overflow-hidden pb-1">
                   <motion.span
@@ -149,11 +150,11 @@ function Hero() {
               ))}
             </h1>
 
-            <motion.p className="mt-5 max-w-md text-white/80" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.95, duration: 0.6 }}>
+            <motion.p className="mt-5 max-w-md text-white/80 short:mt-3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.95, duration: 0.6 }}>
               {t.hero.sub}
             </motion.p>
 
-            <motion.div className="mt-8 flex flex-wrap gap-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 0.6 }}>
+            <motion.div className="mt-8 flex flex-wrap gap-4 short:mt-5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 0.6 }}>
               <Link to="/contact" className="pointer-events-auto rounded-full bg-orange px-7 py-3 font-display font-semibold text-navy transition-colors hover:bg-orange-light">
                 {t.hero.primary}
               </Link>
@@ -166,14 +167,14 @@ function Hero() {
             </motion.div>
 
             <motion.div
-              className="mt-10 flex flex-wrap gap-x-8 gap-y-4 border-t border-white/15 pt-6"
+              className="mt-10 flex flex-wrap gap-x-8 gap-y-4 border-t border-white/15 pt-6 short:mt-6 short:pt-4 tiny:mt-4 tiny:pt-3"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.25, duration: 0.6 }}
             >
               {t.home.facts.map((fact) => (
                 <div key={fact.label} className="min-w-[6rem]">
-                  <p className="font-display text-3xl font-bold text-orange">
+                  <p className="font-display text-3xl font-bold text-orange short:text-2xl">
                     <Counter value={fact.value} />
                   </p>
                   <p className="mt-1 max-w-[10rem] text-xs leading-snug text-white/60">{fact.label}</p>
@@ -203,7 +204,7 @@ function Hero() {
           {t.hero.scrollHint}
         </motion.div>
 
-        <p className="pointer-events-none absolute bottom-6 right-6 hidden items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-white/50 md:flex">
+        <p className="pointer-events-none absolute bottom-6 left-6 hidden items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-white/50 md:flex">
           <span className="h-2 w-2 animate-ping rounded-full bg-orange motion-reduce:animate-none" />
           {t.hero.hint}
         </p>
@@ -220,29 +221,28 @@ function MissionVision() {
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange">{t.home.whyEyebrow}</p>
         <h2 className="mt-3 max-w-2xl text-3xl font-bold text-navy sm:text-4xl">{t.home.whyTitle}</h2>
       </Reveal>
-      <div className="mt-12 grid gap-8 md:grid-cols-2">
-        <Reveal delay={0.1}>
-          <TiltCard className="relative h-full overflow-hidden bg-navy p-8 text-white *:relative">
-            <NavyPattern />
-            <h3 className="text-sm font-semibold uppercase tracking-[0.25em] text-orange" style={{ transform: "translateZ(40px)" }}>
-              {t.common.vision}
-            </h3>
-            <p className="mt-4 text-lg text-white/85" style={{ transform: "translateZ(30px)" }}>
-              {t.common.visionText}
-            </p>
-          </TiltCard>
-        </Reveal>
-        <Reveal delay={0.2}>
-          <TiltCard className="relative h-full border-2 border-navy bg-white p-8">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.25em] text-orange" style={{ transform: "translateZ(40px)" }}>
-              {t.common.mission}
-            </h3>
-            <p className="mt-4 text-lg text-navy/80" style={{ transform: "translateZ(30px)" }}>
-              {t.common.missionText}
-            </p>
-          </TiltCard>
-        </Reveal>
+      <div className="mt-12">
+        <VisionMission />
       </div>
+      <Reveal className="mt-12">
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange">{t.about.valuesEyebrow}</p>
+          <Link to="/mandate" className="group flex items-center gap-2 font-display text-sm font-semibold text-navy">
+            {t.nav.mandate}
+            <span className="text-orange transition-transform group-hover:translate-x-1">→</span>
+          </Link>
+        </div>
+        <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {t.about.values.map((value, i) => (
+            <li key={value.title}>
+              <Link to="/mandate" className="flex h-full flex-col rounded-3xl border-2 border-navy/10 p-5 transition-colors hover:border-orange">
+                <span className="font-display text-sm font-bold text-orange">{String(i + 1).padStart(2, "0")}</span>
+                <span className="mt-2 font-display font-bold leading-snug text-navy">{value.title}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Reveal>
     </section>
   );
 }

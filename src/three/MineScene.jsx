@@ -5,37 +5,13 @@ import * as THREE from "three";
 import { mineControls } from "./mineControls";
 import { AMBER, NAVY, ORANGE, STEEL } from "./palette";
 import { glowTexture, surfaceTextures } from "./textures";
-import { deformedRock, displacedPlane, mulberry32 } from "./geometry";
-import MinerFigure, { Pickaxe, Shovel } from "./MinerFigure";
+import { deformedRock, displacedPlane, mulberry32, segment } from "./geometry";
+import MinerFigure, { GasDetector, Tablet } from "./MinerFigure";
+import DrillingRig from "./DrillingRig";
 import Shadowed from "./Shadowed";
 
 const FOG = "#0a1d2b";
-const SWING_PERIOD = 1.7;
-const IMPACT_PHASE = 0.82;
-const RAISED = -3.3;
-const STRIKE = -1.0;
-
 const lerp = THREE.MathUtils.lerp;
-const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
-const easeIn = (t) => t * t * t;
-
-// [arm rotation, torso lean] for a point in the swing cycle (0..1).
-function swingPose(p) {
-  if (p < 0.55) {
-    const t = easeInOut(p / 0.55);
-    return [lerp(STRIKE + 0.15, RAISED, t), lerp(0.3, -0.12, t)];
-  }
-  if (p < 0.7) {
-    const t = (p - 0.55) / 0.15;
-    return [RAISED - Math.sin(t * Math.PI) * 0.12, -0.12];
-  }
-  if (p < IMPACT_PHASE) {
-    const t = easeIn((p - 0.7) / (IMPACT_PHASE - 0.7));
-    return [lerp(RAISED, STRIKE, t), lerp(-0.12, 0.38, t)];
-  }
-  const t = (p - IMPACT_PHASE) / (1 - IMPACT_PHASE);
-  return [STRIKE + Math.sin(t * Math.PI) * 0.12 + t * 0.15, lerp(0.38, 0.3, t)];
-}
 
 const oreMaterial = new THREE.MeshStandardMaterial({ color: ORANGE, emissive: AMBER, emissiveIntensity: 0.6, flatShading: true, roughness: 0.25, metalness: 0.35 });
 
@@ -43,62 +19,21 @@ function rockTextures(key, repeat) {
   return surfaceTextures({ key, size: 512, dark: "#0c1c28", light: "#465f71", scale: 6, speckle: 0.012, veins: "#9c6a33", repeat });
 }
 
-function SwingingMiner() {
-  const spine = useRef();
-  const arms = useRef();
-  const pickHead = useRef();
-  const phase = useRef(0.1);
-  const boost = useRef(0);
-  const hit = useMemo(() => new THREE.Vector3(), []);
-
-  useFrame((_, delta) => {
-    const c = mineControls;
-    const dt = Math.min(delta, 0.05);
-    if (c.strike) {
-      boost.current = 2.4;
-      c.strike = false;
-    }
-    boost.current = Math.max(0, boost.current - dt);
-    const speed = (c.reducedMotion ? 0.4 : 1) * (boost.current > 0 ? 2.1 : 1);
-
-    const prev = phase.current;
-    let next = prev + (dt * speed) / SWING_PERIOD;
-    const wrapped = next >= 1;
-    if (wrapped) next -= 1;
-    phase.current = next;
-
-    const [arm, lean] = swingPose(next);
-    arms.current.rotation.x = arm;
-    spine.current.rotation.x = lean;
-
-    if (prev < IMPACT_PHASE && (next >= IMPACT_PHASE || wrapped)) {
-      pickHead.current.getWorldPosition(hit);
-      c.burst = { point: hit.clone(), amount: boost.current > 0 ? 28 : 18 };
-      c.flash = 1;
-      c.shake = boost.current > 0 ? 0.12 : 0.05;
-    }
-  });
-
-  return (
-    <Shadowed cast receive={false} position={[1.6, 0, 0.3]} rotation={[0, Math.PI / 2, 0]}>
-      <MinerFigure spineRef={spine} armsRef={arms} lampShadow beam tool={<Pickaxe headRef={pickHead} />} />
-    </Shadowed>
-  );
-}
-
-function ShovelWorker() {
+// Shift supervisor further down the drive, checking readings on a tablet.
+function Supervisor() {
   const spine = useRef();
   const arms = useRef();
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    spine.current.rotation.x = 0.08 + Math.sin(t * 1.4) * 0.02;
-    spine.current.rotation.y = Math.sin(t * 0.35) * 0.25;
-    arms.current.rotation.x = -0.55;
+    const t = mineControls.reducedMotion ? 0 : clock.elapsedTime;
+    const glance = (Math.sin(t * 0.3) + 1) / 2;
+    spine.current.rotation.x = 0.05 + glance * 0.12 + Math.sin(t * 1.4) * 0.01;
+    spine.current.rotation.y = Math.sin(t * 0.35) * 0.3 * (1 - glance);
+    arms.current.rotation.x = -0.95 + Math.sin(t * 1.4) * 0.015;
   });
   return (
     <Shadowed cast receive={false} position={[-1.35, 0, -4.2]} rotation={[0, 0.7, 0]}>
-      <MinerFigure spineRef={spine} armsRef={arms}>
-        <Shovel />
+      <MinerFigure spineRef={spine} armsRef={arms} tool={<Tablet />}>
+        <GasDetector />
       </MinerFigure>
     </Shadowed>
   );
@@ -126,7 +61,7 @@ const ore = [
   { position: [3.3, 1.2, -2.2], rotation: [0.3, 0, Math.PI / 2 + 0.1], radius: 0.09, height: 0.28 },
 ];
 
-function RockFace() {
+function RockFace({ rockRef }) {
   const geometries = useMemo(() => boulders.map((b) => deformedRock(b.radius, b.seed)), []);
   const rock = rockTextures("mine-rock", 1);
 
@@ -136,36 +71,54 @@ function RockFace() {
   });
 
   return (
-    <Shadowed>
-      {boulders.map((b, i) => (
-        <mesh key={b.seed} geometry={geometries[i]} position={b.position}>
-          <meshStandardMaterial map={rock.map} bumpMap={rock.bump} bumpScale={4} roughness={0.92} />
-        </mesh>
-      ))}
-      {ore.map((o, i) => (
-        <group key={i} position={o.position} rotation={o.rotation}>
-          <mesh position={[0, o.height / 2, 0]} material={oreMaterial}>
-            <cylinderGeometry args={[o.radius, o.radius * 1.1, o.height, 6]} />
+    <group ref={rockRef}>
+      <Shadowed>
+        {boulders.map((b, i) => (
+          <mesh key={b.seed} geometry={geometries[i]} position={b.position}>
+            <meshStandardMaterial map={rock.map} bumpMap={rock.bump} bumpScale={4} roughness={0.92} />
           </mesh>
-          <mesh position={[0, o.height + o.radius * 0.9, 0]} material={oreMaterial}>
-            <coneGeometry args={[o.radius, o.radius * 1.8, 6]} />
-          </mesh>
-        </group>
-      ))}
-    </Shadowed>
+        ))}
+        {ore.map((o, i) => (
+          <group key={i} position={o.position} rotation={o.rotation}>
+            <mesh position={[0, o.height / 2, 0]} material={oreMaterial}>
+              <cylinderGeometry args={[o.radius, o.radius * 1.1, o.height, 6]} />
+            </mesh>
+            <mesh position={[0, o.height + o.radius * 0.9, 0]} material={oreMaterial}>
+              <coneGeometry args={[o.radius, o.radius * 1.8, 6]} />
+            </mesh>
+          </group>
+        ))}
+      </Shadowed>
+    </group>
   );
 }
 
-function Sparks() {
-  const COUNT = 70;
+// Debris from the drill collar: flushing-water mist, rock dust, chips and the odd spark.
+const SPARK = 0;
+const CHIP = 1;
+const DUST = 2;
+const MIST = 3;
+const PARTICLE_PHYSICS = {
+  [SPARK]: { gravity: 6, drag: 0.2 },
+  [CHIP]: { gravity: 6, drag: 0.2 },
+  [DUST]: { gravity: 0.35, drag: 1.6 },
+  [MIST]: { gravity: 2.2, drag: 0.9 },
+};
+
+function Debris() {
+  const COUNT = 180;
   const mesh = useRef();
   const next = useRef(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const colors = useMemo(() => ({ spark: new THREE.Color(AMBER), hot: new THREE.Color("#fff1d6"), chip: new THREE.Color("#2d4556") }), []);
-  const particles = useRef(Array.from({ length: COUNT }, () => ({ life: 0, maxLife: 1, size: 1, spark: true, pos: new THREE.Vector3(), vel: new THREE.Vector3() })));
+  const side = useMemo(() => new THREE.Vector3(), []);
+  const colors = useMemo(
+    () => ({ spark: new THREE.Color(AMBER), hot: new THREE.Color("#fff1d6"), chip: new THREE.Color("#2d4556"), dust: new THREE.Color("#8fa3b3"), mist: new THREE.Color("#d9ecfa") }),
+    []
+  );
+  const particles = useRef(Array.from({ length: COUNT }, () => ({ life: 0, maxLife: 1, size: 1, kind: DUST, pos: new THREE.Vector3(), vel: new THREE.Vector3() })));
 
   useLayoutEffect(() => {
-    for (let i = 0; i < COUNT; i++) mesh.current.setColorAt(i, colors.spark);
+    for (let i = 0; i < COUNT; i++) mesh.current.setColorAt(i, colors.dust);
     mesh.current.instanceColor.needsUpdate = true;
   }, [colors]);
 
@@ -173,24 +126,35 @@ function Sparks() {
     const dt = Math.min(delta, 0.05);
     const c = mineControls;
     if (c.burst) {
-      for (let n = 0; n < c.burst.amount; n++) {
+      const { point, dir, amount, sparks = 0.1 } = c.burst;
+      side.set(0, 1, 0).cross(dir).normalize();
+      for (let n = 0; n < amount; n++) {
         const i = next.current;
         next.current = (i + 1) % COUNT;
         const p = particles.current[i];
-        p.spark = Math.random() > 0.35;
-        p.life = p.maxLife = 0.45 + Math.random() * 0.55;
-        p.size = p.spark ? 0.5 + Math.random() * 0.6 : 0.9 + Math.random() * 1.3;
-        p.pos.copy(c.burst.point);
-        p.vel.set(-(0.5 + Math.random() * 2.2), 0.6 + Math.random() * 2.4, (Math.random() - 0.5) * 2.2);
-        mesh.current.setColorAt(i, p.spark ? (Math.random() > 0.5 ? colors.hot : colors.spark) : colors.chip);
+        const r = Math.random();
+        p.kind = r < sparks ? SPARK : r < sparks + 0.2 ? CHIP : r < sparks + 0.55 ? MIST : DUST;
+        const fast = p.kind === SPARK || p.kind === CHIP;
+        p.life = p.maxLife = p.kind === DUST ? 1.2 + Math.random() * 1.2 : 0.45 + Math.random() * 0.55;
+        p.size = p.kind === SPARK ? 0.5 + Math.random() * 0.6 : p.kind === DUST ? 1.4 + Math.random() * 1.6 : 0.7 + Math.random() * 1.1;
+        p.pos.copy(point);
+        p.vel
+          .copy(dir)
+          .multiplyScalar((fast ? 1 : 0.5) + Math.random() * (fast ? 2 : 0.9))
+          .addScaledVector(side, (Math.random() - 0.5) * (fast ? 2 : 1.2));
+        p.vel.y += (fast ? 0.6 : 0.1) + Math.random() * (fast ? 2 : 0.6);
+        const color = { [SPARK]: Math.random() > 0.5 ? colors.hot : colors.spark, [CHIP]: colors.chip, [DUST]: colors.dust, [MIST]: colors.mist }[p.kind];
+        mesh.current.setColorAt(i, color);
       }
       mesh.current.instanceColor.needsUpdate = true;
       c.burst = null;
     }
     particles.current.forEach((p, i) => {
       if (p.life > 0) {
+        const physics = PARTICLE_PHYSICS[p.kind];
         p.life -= dt;
-        p.vel.y -= 6 * dt;
+        p.vel.y -= physics.gravity * dt;
+        p.vel.multiplyScalar(Math.max(0, 1 - physics.drag * dt));
         p.pos.addScaledVector(p.vel, dt);
         if (p.pos.y < 0.03) {
           p.pos.y = 0.03;
@@ -198,9 +162,11 @@ function Sparks() {
           p.vel.y = Math.abs(p.vel.y) * 0.4;
         }
       }
+      const fade = p.life / p.maxLife;
+      const grow = p.kind === DUST ? 1 + (1 - fade) * 1.5 : 1;
       dummy.position.copy(p.pos);
       dummy.rotation.set(p.pos.x * 5, p.pos.y * 5, 0);
-      dummy.scale.setScalar(p.life > 0 ? 0.035 * p.size * (p.spark ? p.life / p.maxLife : 1) : 0);
+      dummy.scale.setScalar(p.life > 0 ? 0.03 * p.size * grow * (p.kind === CHIP ? 1 : fade) : 0);
       dummy.updateMatrix();
       mesh.current.setMatrixAt(i, dummy.matrix);
     });
@@ -356,6 +322,12 @@ function MineCart() {
   );
 }
 
+// Spare drill steels leaning against the face-side boulder.
+const spareSteels = [0, 1, 2].map((i) => {
+  const { position, length, quaternion } = segment([2.9 + i * 0.03, 0.02, 2.3 + i * 0.1], [3.28, 1.05 - i * 0.08, 2.18 + i * 0.12]);
+  return { position: position.toArray(), length, quaternion: quaternion.toArray() };
+});
+
 function Equipment() {
   const wood = surfaceTextures({ key: "timber", dark: "#3e2616", light: "#7a5232", scale: 4, veins: "#2c1a0e" });
   const barrels = [
@@ -441,16 +413,12 @@ function Equipment() {
       <mesh geometry={cable}>
         <meshStandardMaterial color="#111" roughness={0.6} />
       </mesh>
-      <group position={[3.2, 0.55, 2.2]} rotation={[0.1, -0.4, -0.35]}>
-        <mesh>
-          <cylinderGeometry args={[0.025, 0.025, 1.2, 8]} />
-          <meshStandardMaterial map={wood.map} roughness={0.8} />
+      {spareSteels.map((rod) => (
+        <mesh key={rod.position[2]} position={rod.position} quaternion={rod.quaternion}>
+          <cylinderGeometry args={[0.017, 0.017, rod.length, 6]} />
+          <meshStandardMaterial color="#8c99a3" metalness={0.85} roughness={0.35} />
         </mesh>
-        <mesh position={[0, -0.66, 0.02]} scale={[1, 1, 0.25]}>
-          <sphereGeometry args={[0.16, 16, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-          <meshStandardMaterial color={STEEL} metalness={0.85} roughness={0.5} side={THREE.DoubleSide} />
-        </mesh>
-      </group>
+      ))}
     </Shadowed>
   );
 }
@@ -514,21 +482,22 @@ function Lantern({ position, offset = 0, shadow = false }) {
 }
 
 // Scroll-driven fly-through: wide shot, rock face close-up, turn down the tunnel, head for the exit glow.
+// A stop may carry a `narrow` override for portrait phones, where the horizontal field of view is tight.
 const CAMERA_PATH = [
-  { at: 0, pos: [-0.6, 1.8, 7.2], look: [-0.2, 1.1, -0.4] },
-  { at: 0.33, pos: [0.15, 1.65, 3.7], look: [2.8, 1.0, 0.1] },
+  { at: 0, pos: [-0.6, 1.8, 7.2], look: [-0.2, 1.1, -0.4], narrow: { pos: [2.0, 2.0, 9.5], look: [2.2, 1.0, 0] } },
+  { at: 0.33, pos: [0.15, 1.65, 3.7], look: [2.5, 1.05, 0.15], narrow: { pos: [0.6, 1.7, 4.4], look: [1.8, 1.1, 0.3] } },
   { at: 0.66, pos: [0.35, 1.55, 1.9], look: [0.6, 0.9, -6] },
   { at: 1, pos: [0.8, 1.3, -8.5], look: [0.8, 1.2, -20] },
 ];
-const NARROW_START = { pos: [2.0, 2.0, 9.5], look: [2.2, 1.0, 0] };
 const smoothstep = (t) => t * t * (3 - 2 * t);
 
 function samplePath(progress, narrow, key) {
   let i = 0;
   while (i < CAMERA_PATH.length - 2 && progress > CAMERA_PATH[i + 1].at) i++;
-  const from = i === 0 && narrow ? NARROW_START : CAMERA_PATH[i];
-  const to = CAMERA_PATH[i + 1];
-  const t = smoothstep(THREE.MathUtils.clamp((progress - CAMERA_PATH[i].at) / (to.at - CAMERA_PATH[i].at), 0, 1));
+  const stop = (k) => (narrow && CAMERA_PATH[k].narrow) || CAMERA_PATH[k];
+  const from = stop(i);
+  const to = stop(i + 1);
+  const t = smoothstep(THREE.MathUtils.clamp((progress - CAMERA_PATH[i].at) / (CAMERA_PATH[i + 1].at - CAMERA_PATH[i].at), 0, 1));
   return [0, 1, 2].map((k) => lerp(from[key][k], to[key][k], t));
 }
 
@@ -594,6 +563,7 @@ function CameraRig() {
 }
 
 export function MineWorld() {
+  const rockRef = useRef(null);
   return (
     <>
       <color attach="background" args={[FOG]} />
@@ -610,10 +580,10 @@ export function MineWorld() {
       <Gravel />
       <Equipment />
       <MineCart />
-      <RockFace />
-      <SwingingMiner />
-      <ShovelWorker />
-      <Sparks />
+      <RockFace rockRef={rockRef} />
+      <DrillingRig rockRef={rockRef} />
+      <Supervisor />
+      <Debris />
       <Lantern position={[1.0, 3.0, -1.6]} shadow />
       <Lantern position={[3.8, 3.0, -7.5]} offset={2} />
       <Lantern position={[-1.8, 3.0, -11.8]} offset={4} />

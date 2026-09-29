@@ -1,15 +1,22 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageHero from "../components/PageHero";
 import { Reveal, Stagger } from "../components/motion";
 import NavyPattern from "../components/NavyPattern";
+import Placeholder from "../components/Placeholder";
 import { staggerItem } from "../components/variants";
 import { ServiceIllustration } from "../components/illustrations";
+import { PhoneIcon, WhatsAppIcon } from "../components/icons";
 import { useLanguage } from "../i18n/context";
+import { company, phoneHref, whatsappHref } from "../data/company";
+import { hasInbox, sendEnquiry } from "../lib/enquiries";
 
-const EMAIL = "contact@jdmining.rw";
+// Stable ids for the topic options (labels come from t.contact.inquiries, in the same order),
+// so links such as /contact?topic=general can preselect one.
+const TOPICS = ["supply-chain", "tailings", "technical", "training", "policy", "general"];
 
-function Field({ id, label, type = "text", required = true, multiline = false }) {
+function Field({ id, label, type = "text", required = true, multiline = false, autoComplete }) {
   const Tag = multiline ? "textarea" : "input";
   return (
     <div className="relative">
@@ -19,6 +26,7 @@ function Field({ id, label, type = "text", required = true, multiline = false })
         type={multiline ? undefined : type}
         rows={multiline ? 5 : undefined}
         required={required}
+        autoComplete={autoComplete}
         placeholder=" "
         className="peer w-full resize-none rounded-2xl border-2 border-navy/15 bg-white px-4 pb-3 pt-7 text-navy outline-none transition hover:border-navy/30 focus:border-orange focus:shadow-[0_0_0_4px_rgba(226,138,46,0.15)]"
       />
@@ -41,20 +49,48 @@ function StepTitle({ number, children }) {
   );
 }
 
+function InfoLabel({ children }) {
+  return <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange">{children}</p>;
+}
+
 export default function Contact() {
   const { t } = useLanguage();
-  const [topic, setTopic] = useState(0);
+  const [searchParams] = useSearchParams();
+  const topicParam = searchParams.get("topic");
+  const [topic, setTopic] = useState(() => Math.max(0, TOPICS.indexOf(topicParam)));
+  const [seenParam, setSeenParam] = useState(topicParam);
+  if (topicParam !== seenParam) {
+    // The support launcher can link here with a new ?topic= while this page is already open.
+    setSeenParam(topicParam);
+    if (TOPICS.includes(topicParam)) setTopic(TOPICS.indexOf(topicParam));
+  }
   const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState("idle");
 
   async function copyEmail() {
     try {
-      await navigator.clipboard.writeText(EMAIL);
+      await navigator.clipboard.writeText(company.email);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      window.location.href = `mailto:${EMAIL}`;
+      window.location.href = `mailto:${company.email}`;
     }
   }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    setStatus("sending");
+    try {
+      const result = await sendEnquiry({ ...data, topic: t.contact.inquiries[topic], topicId: TOPICS[topic] });
+      setStatus(result);
+      if (result === "sent") event.target.reset();
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  const feedback = { sent: t.contact.sent, mailto: t.contact.mailtoOpened, error: t.contact.error }[status];
 
   return (
     <>
@@ -73,26 +109,51 @@ export default function Contact() {
               <path d="M0 120 L0 95 L60 78 L110 92 L170 70 L230 94 L290 76 L350 92 L400 80 L400 120 Z" fill="#E28A2E" fillOpacity="0.12" />
             </svg>
 
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange">{t.contact.label}</p>
-            <a href={`mailto:${EMAIL}`} className="mt-4 block break-all font-display text-2xl font-bold transition-colors hover:text-orange">
-              {EMAIL}
+            <InfoLabel>{t.contact.emailLabel}</InfoLabel>
+            <a href={`mailto:${company.email}`} className="mt-3 block break-all font-display text-2xl font-bold transition-colors hover:text-orange">
+              {company.email}
             </a>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={copyEmail}
-                className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold transition-colors hover:border-orange hover:text-orange"
-              >
-                {copied ? `✓ ${t.contact.copied}` : t.contact.copy}
-              </button>
-              <span className="flex items-center gap-2 text-sm text-white/60">
-                <span className="h-2 w-2 rounded-full bg-orange" />
-                {t.contact.region}
-              </span>
+            <button
+              type="button"
+              onClick={copyEmail}
+              className="mt-3 rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold transition-colors hover:border-orange hover:text-orange"
+            >
+              {copied ? `✓ ${t.contact.copied}` : t.contact.copy}
+            </button>
+
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <InfoLabel>{t.contact.phoneLabel}</InfoLabel>
+              <a href={phoneHref} className="mt-3 block font-display text-2xl font-bold transition-colors hover:text-orange">
+                {company.phone}
+              </a>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a
+                  href={whatsappHref(t.assistant.whatsappMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-1.5 text-xs font-bold text-navy transition hover:brightness-110"
+                >
+                  <WhatsAppIcon />
+                  {t.contact.whatsapp}
+                </a>
+                <a href={phoneHref} className="flex items-center gap-2 rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold transition-colors hover:border-orange hover:text-orange">
+                  <PhoneIcon />
+                  {t.contact.call}
+                </a>
+              </div>
             </div>
 
-            <div className="relative mt-10 border-t border-white/10 pt-8 pb-10">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange">{t.contact.nextTitle}</p>
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <InfoLabel>{t.contact.addressLabel}</InfoLabel>
+              <div className="mt-3">{company.address ? <p className="text-white/85">{company.address}</p> : <Placeholder tone="dark" />}</div>
+              <p className="mt-3 flex items-center gap-2 text-sm text-white/60">
+                <span className="h-2 w-2 rounded-full bg-orange" />
+                {t.contact.region}
+              </p>
+            </div>
+
+            <div className="relative mt-8 border-t border-white/10 pb-10 pt-6">
+              <InfoLabel>{t.contact.nextTitle}</InfoLabel>
               <Stagger as="ul" className="relative mt-6 space-y-6">
                 <span className="absolute bottom-3 left-[15px] top-3 w-px bg-white/15" />
                 {t.contact.next.map((step, i) => (
@@ -110,9 +171,7 @@ export default function Contact() {
 
         <Reveal delay={0.15}>
           <form
-            action={`mailto:${EMAIL}`}
-            method="post"
-            encType="text/plain"
+            onSubmit={handleSubmit}
             className="space-y-10 rounded-3xl border-2 border-navy/10 bg-white p-6 shadow-[0_30px_70px_-40px_rgba(14,41,62,0.45)] sm:p-10"
           >
             <fieldset>
@@ -125,11 +184,11 @@ export default function Contact() {
                   return (
                     <label
                       key={item}
-                      className={`relative flex items-center gap-3 rounded-2xl border-2 px-4 py-3.5 text-sm font-semibold transition-all ${
+                      className={`relative flex items-center gap-3 rounded-2xl border-2 px-4 py-3.5 text-sm font-semibold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-orange ${
                         active ? "border-navy bg-navy text-white shadow-lg" : "border-navy/10 text-navy hover:-translate-y-0.5 hover:border-orange"
                       }`}
                     >
-                      <input type="radio" name="topic" value={item} checked={active} onChange={() => setTopic(i)} className="sr-only" />
+                      <input type="radio" name="topicChoice" value={TOPICS[i]} checked={active} onChange={() => setTopic(i)} className="sr-only" />
                       <span
                         className={`grid h-5 w-5 flex-none place-items-center rounded-full border-2 text-[10px] transition-colors ${
                           active ? "border-orange bg-orange text-navy" : "border-navy/25"
@@ -147,11 +206,10 @@ export default function Contact() {
             <div>
               <StepTitle number="2">{t.contact.stepDetails}</StepTitle>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Field id="name" label={t.contact.name} />
-                <Field id="email" type="email" label={t.contact.email} />
-                <div className="sm:col-span-2">
-                  <Field id="organization" label={t.contact.organization} required={false} />
-                </div>
+                <Field id="name" label={t.contact.name} autoComplete="name" />
+                <Field id="email" type="email" label={t.contact.email} autoComplete="email" />
+                <Field id="phone" type="tel" label={t.contact.phone} required={false} autoComplete="tel" />
+                <Field id="organization" label={t.contact.organization} required={false} autoComplete="organization" />
               </div>
             </div>
 
@@ -162,15 +220,26 @@ export default function Contact() {
               </div>
             </div>
 
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-navy/50">{t.contact.sendNote}</p>
-              <button
-                type="submit"
-                className="group flex items-center gap-3 rounded-full bg-navy py-2 pl-7 pr-2 font-display font-semibold text-white transition-colors hover:bg-navy-light"
-              >
-                {t.contact.send}
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-orange text-navy transition-transform group-hover:translate-x-1 group-hover:-rotate-45">→</span>
-              </button>
+            <div className="space-y-4">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-navy/50">{hasInbox ? t.contact.sendNoteInbox : t.contact.sendNote}</p>
+                <button
+                  type="submit"
+                  disabled={status === "sending"}
+                  className="group flex items-center gap-3 rounded-full bg-navy py-2 pl-7 pr-2 font-display font-semibold text-white transition-colors hover:bg-navy-light disabled:opacity-60"
+                >
+                  {status === "sending" ? t.contact.sending : t.contact.send}
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-orange text-navy transition-transform group-hover:translate-x-1 group-hover:-rotate-45">→</span>
+                </button>
+              </div>
+              {feedback && (
+                <p
+                  role="status"
+                  className={`rounded-2xl px-4 py-3 text-sm ${status === "error" ? "bg-red-50 text-red-800" : "bg-orange/10 text-navy"}`}
+                >
+                  {feedback}
+                </p>
+              )}
             </div>
           </form>
         </Reveal>

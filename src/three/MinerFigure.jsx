@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { hardHatGeometries, segment } from "./geometry";
-import { ORANGE, REFLECTIVE, SKIN, STEEL, SUIT, TIMBER } from "./palette";
+import { ORANGE, REFLECTIVE, SKIN, STEEL, SUIT } from "./palette";
 
 const DARK_RUBBER = "#0a141c";
 const LEATHER = "#2a1d12";
@@ -112,7 +112,47 @@ function Arm({ side }) {
   );
 }
 
-function Head({ lampTarget, lampShadow, beam }) {
+function EarMuffs() {
+  return (
+    <group>
+      {[-1, 1].map((s) => (
+        <group key={s}>
+          <mesh position={[s * 0.15, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.058, 0.058, 0.05, 20]} />
+            <meshStandardMaterial color={ORANGE} roughness={0.5} />
+          </mesh>
+          <mesh position={[s * 0.178, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.045, 0.058, 0.012, 20]} />
+            <meshStandardMaterial color="#141c22" roughness={0.6} />
+          </mesh>
+          <mesh position={[s * 0.16, 0.07, 0]} rotation={[0, 0, s * 0.25]}>
+            <boxGeometry args={[0.014, 0.1, 0.03]} />
+            <meshStandardMaterial color="#141c22" roughness={0.6} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function Respirator() {
+  return (
+    <group position={[0, -0.065, 0.1]}>
+      <mesh scale={[1, 0.85, 0.75]}>
+        <sphereGeometry args={[0.075, 18, 14, 0, Math.PI * 2, 0, Math.PI / 1.6]} />
+        <meshStandardMaterial color="#d7dde2" roughness={0.55} />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * 0.06, -0.02, 0.035]} rotation={[Math.PI / 2, 0, s * 0.7]}>
+          <cylinderGeometry args={[0.03, 0.03, 0.03, 16]} />
+          <meshStandardMaterial color={ORANGE} roughness={0.6} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Head({ lampTarget, lampShadow, beam, earMuffs, respirator }) {
   const { shell, ridge } = hardHatGeometries();
   const skin = <meshStandardMaterial color={SKIN} roughness={0.65} />;
   return (
@@ -139,6 +179,8 @@ function Head({ lampTarget, lampShadow, beam }) {
         <sphereGeometry args={[0.08, 12, 12]} />
         {skin}
       </mesh>
+      {earMuffs && <EarMuffs />}
+      {respirator && <Respirator />}
 
       <group position={[0, 0.07, 0]} scale={0.235}>
         <mesh geometry={shell}>
@@ -180,56 +222,47 @@ function Head({ lampTarget, lampShadow, beam }) {
   );
 }
 
-export function Pickaxe({ headRef }) {
-  const steel = <meshStandardMaterial color={STEEL} metalness={0.9} roughness={0.28} />;
+// Supervisor's field tablet, held flat in both hands (lives in the arms group).
+export function Tablet() {
   return (
-    <group>
-      <mesh position={[0, -0.97, 0]}>
-        <cylinderGeometry args={[0.026, 0.032, 1.0, 10]} />
-        <meshStandardMaterial color={TIMBER} roughness={0.7} />
-      </mesh>
-      <mesh position={[0, -0.62, 0]}>
-        <cylinderGeometry args={[0.034, 0.034, 0.2, 10]} />
-        <meshStandardMaterial color="#141414" roughness={0.9} />
-      </mesh>
-      <group ref={headRef} position={[0, -1.43, 0]}>
-        <mesh>
-          <boxGeometry args={[0.08, 0.11, 0.11]} />
-          {steel}
-        </mesh>
-        <mesh position={[0, 0, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <coneGeometry args={[0.042, 0.34, 10]} />
-          {steel}
-        </mesh>
-        <mesh position={[0, 0, 0.16]} rotation={[Math.PI / 2, 0, 0]} scale={[1.6, 1, 0.5]}>
-          <coneGeometry args={[0.035, 0.24, 4]} />
-          {steel}
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
-export function Shovel() {
-  return (
-    <group position={[0, 0.66, 0.36]} rotation={[-0.14, 0, 0]}>
+    <group position={[0, -0.6, 0.06]} rotation={[0.25, 0, 0]}>
       <mesh>
-        <cylinderGeometry args={[0.025, 0.025, 1.2, 10]} />
-        <meshStandardMaterial color={TIMBER} roughness={0.7} />
+        <boxGeometry args={[0.28, 0.02, 0.2]} />
+        <meshStandardMaterial color="#141c22" roughness={0.4} metalness={0.3} />
       </mesh>
-      <mesh position={[0, 0.66, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <torusGeometry args={[0.07, 0.015, 8, 16]} />
-        <meshStandardMaterial color="#141414" roughness={0.8} />
+      <mesh position={[0, 0.011, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.25, 0.17]} />
+        <meshBasicMaterial color="#9cc3e6" toneMapped={false} />
       </mesh>
-      <mesh position={[0, -0.72, 0.02]} scale={[1, 1, 0.25]}>
-        <sphereGeometry args={[0.16, 16, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-        <meshStandardMaterial color={STEEL} metalness={0.85} roughness={0.45} side={THREE.DoubleSide} />
+      <mesh position={[-0.05, 0.012, 0.03]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[0.1, 0.02]} />
+        <meshBasicMaterial color={ORANGE} toneMapped={false} />
       </mesh>
     </group>
   );
 }
 
-export default function MinerFigure({ spineRef, armsRef, children, lampShadow = false, beam = false, tool = null }) {
+// Personal gas monitor clipped to the vest.
+export function GasDetector() {
+  return (
+    <group position={[0.13, 1.5, 0.17]}>
+      <mesh>
+        <boxGeometry args={[0.07, 0.1, 0.035]} />
+        <meshStandardMaterial color={ORANGE} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0.02, 0.018]}>
+        <planeGeometry args={[0.045, 0.03]} />
+        <meshBasicMaterial color="#0b1620" />
+      </mesh>
+      <mesh position={[0, -0.03, 0.019]}>
+        <circleGeometry args={[0.008, 10]} />
+        <meshBasicMaterial color="#4ade80" toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+export default function MinerFigure({ spineRef, armsRef, children, lampShadow = false, beam = false, earMuffs = false, respirator = false, tool = null }) {
   const lampTarget = useMemo(() => new THREE.Object3D(), []);
   const suit = <meshStandardMaterial color={SUIT} roughness={0.85} />;
 
@@ -280,7 +313,7 @@ export default function MinerFigure({ spineRef, armsRef, children, lampShadow = 
           <cylinderGeometry args={[0.065, 0.075, 0.1, 12]} />
           <meshStandardMaterial color={SKIN} roughness={0.65} />
         </mesh>
-        <Head lampTarget={lampTarget} lampShadow={lampShadow} beam={beam} />
+        <Head lampTarget={lampTarget} lampShadow={lampShadow} beam={beam} earMuffs={earMuffs} respirator={respirator} />
         <group ref={armsRef} position={[0, 0.64, 0.02]}>
           <Arm side={-1} />
           <Arm side={1} />

@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/content-check.mjs && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "i18n:check": "node scripts/i18n.mjs check",
+    "i18n:export": "node scripts/i18n.mjs export",
+    "content:check": "node scripts/content-check.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
