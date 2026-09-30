@@ -57,13 +57,15 @@ export default function Contact() {
   const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const topicParam = searchParams.get("topic");
-  const [topic, setTopic] = useState(() => Math.max(0, TOPICS.indexOf(topicParam)));
+  // Visitors may pick several topics; a ?topic= link preselects one.
+  const [topics, setTopics] = useState(() => (TOPICS.includes(topicParam) ? [TOPICS.indexOf(topicParam)] : []));
   const [seenParam, setSeenParam] = useState(topicParam);
   if (topicParam !== seenParam) {
     // The support launcher can link here with a new ?topic= while this page is already open.
     setSeenParam(topicParam);
-    if (TOPICS.includes(topicParam)) setTopic(TOPICS.indexOf(topicParam));
+    if (TOPICS.includes(topicParam) && !topics.includes(TOPICS.indexOf(topicParam))) setTopics([...topics, TOPICS.indexOf(topicParam)]);
   }
+  const toggleTopic = (i) => setTopics((current) => (current.includes(i) ? current.filter((x) => x !== i) : [...current, i].sort((a, b) => a - b)));
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState("idle");
 
@@ -82,9 +84,18 @@ export default function Contact() {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     setStatus("sending");
     try {
-      const result = await sendEnquiry({ ...data, topic: t.contact.inquiries[topic], topicId: TOPICS[topic] });
+      // No topic chosen counts as a general enquiry.
+      const chosen = topics.length ? topics : [TOPICS.indexOf("general")];
+      const result = await sendEnquiry({
+        ...data,
+        topic: chosen.map((i) => t.contact.inquiries[i]).join(", "),
+        topicIds: chosen.map((i) => TOPICS[i]),
+      });
       setStatus(result);
-      if (result === "sent") event.target.reset();
+      if (result === "sent") {
+        event.target.reset();
+        setTopics([]);
+      }
     } catch {
       setStatus("error");
     }
@@ -178,9 +189,10 @@ export default function Contact() {
               <legend className="contents">
                 <StepTitle number="1">{t.contact.stepTopic}</StepTitle>
               </legend>
+              <p className="mt-2 pl-11 text-sm text-navy/55">{t.contact.stepTopicHint}</p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {t.contact.inquiries.map((item, i) => {
-                  const active = topic === i;
+                  const active = topics.includes(i);
                   return (
                     <label
                       key={item}
@@ -188,9 +200,9 @@ export default function Contact() {
                         active ? "border-navy bg-navy text-white shadow-lg" : "border-navy/10 text-navy hover:-translate-y-0.5 hover:border-orange"
                       }`}
                     >
-                      <input type="radio" name="topicChoice" value={TOPICS[i]} checked={active} onChange={() => setTopic(i)} className="sr-only" />
+                      <input type="checkbox" value={TOPICS[i]} checked={active} onChange={() => toggleTopic(i)} className="sr-only" />
                       <span
-                        className={`grid h-5 w-5 flex-none place-items-center rounded-full border-2 text-[10px] transition-colors ${
+                        className={`grid h-5 w-5 flex-none place-items-center rounded-md border-2 text-[10px] transition-colors ${
                           active ? "border-orange bg-orange text-navy" : "border-navy/25"
                         }`}
                       >

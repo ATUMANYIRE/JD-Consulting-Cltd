@@ -86,8 +86,8 @@ Allowed values:
   `institutional-advisory`.
 - Update `category`: `company`, `insights`, `technical`, `esg`, `training`, `projects`, `events`.
 - Dates: always `YYYY-MM-DD`.
-- Text: a plain string (shown in every language) or `{ "en": "…", "fr": "…", "rw": "…" }` with at
-  least `en`.
+- Text: a plain string (shown in every language) or `{ "en": "…", "fr": "…", "rw": "…", "sw": "…" }`
+  with at least `en`.
 
 Photos: genuine JD Mining Consulting photos only, `.jpg` or `.webp`, about 1600 px wide and under
 500 KB, lowercase names without spaces, each with an `alt` description.

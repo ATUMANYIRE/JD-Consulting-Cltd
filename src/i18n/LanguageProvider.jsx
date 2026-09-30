@@ -14,6 +14,7 @@ function initialLanguage() {
   const browser = (navigator.language || "en").slice(0, 2).toLowerCase();
   if (browser === "fr") return "fr";
   if (browser === "rw" || browser === "ki") return "rw";
+  if (browser === "sw") return "sw";
   return "en";
 }
 

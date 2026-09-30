@@ -83,13 +83,13 @@ async function compress(file) {
   return { contentType: "image/jpeg", data, preview: URL.createObjectURL(blob) };
 }
 
-const L = (value) => (value && typeof value === "object" ? { en: value.en ?? "", fr: value.fr ?? "", rw: value.rw ?? "" } : { en: value ?? "", fr: "", rw: "" });
+// Optional translations of an entry's text; English is always required.
+const OTHER_LANGS = ["fr", "rw", "sw"];
+const L = (value) => Object.fromEntries(["en", ...OTHER_LANGS].map((lang) => [lang, (value && typeof value === "object" ? value[lang] : lang === "en" ? value : "") ?? ""]));
 function fromL(value) {
   const en = value.en.trim();
-  const fr = value.fr.trim();
-  const rw = value.rw.trim();
-  if (!fr && !rw) return en;
-  return { en, ...(fr ? { fr } : {}), ...(rw ? { rw } : {}) };
+  const others = Object.fromEntries(OTHER_LANGS.map((lang) => [lang, value[lang].trim()]).filter(([, text]) => text));
+  return Object.keys(others).length ? { en, ...others } : en;
 }
 const today = () => new Date().toISOString().slice(0, 10);
 const plain = (value) => (value && typeof value === "object" ? value.en : value) ?? "";
@@ -231,6 +231,7 @@ function LangField({ label, hint, value, onChange, multiline, translations }) {
               {[
                 ["fr", "FR", "Français"],
                 ["rw", "KIN", "Kinyarwanda"],
+                ["sw", "SW", "Kiswahili"],
               ].map(([lang, short, name]) => (
                 <div key={lang} className="relative">
                   <span className="pointer-events-none absolute left-3 top-3 rounded-md bg-navy/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-navy/60">{short}</span>
@@ -428,7 +429,7 @@ function Editor({ type, entry, keyValue, onDone, onCancel }) {
   const [form, setForm] = useState(() => toForm(type, entry));
   const [translations, setTranslations] = useState(() => {
     const f = toForm(type, entry);
-    return [f.name, f.description, f.title, f.summary].some((value) => value && (value.fr || value.rw));
+    return [f.name, f.description, f.title, f.summary].some((value) => value && OTHER_LANGS.some((lang) => value[lang]));
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);

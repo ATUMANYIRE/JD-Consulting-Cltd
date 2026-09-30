@@ -3,38 +3,40 @@ import { serviceSlugs } from "../data/services";
 import { vacancies } from "../data/careers";
 import { projects } from "../data/projects";
 
-// Rule-based assistant: it recognizes what a visitor is asking about (English, French or
-// Kinyarwanda keywords) and answers only from the site's own published content. Anything it
+// Rule-based assistant: it recognizes what a visitor is asking about (English, French,
+// Kinyarwanda or Swahili keywords) and answers only from the site's own published content. Anything it
 // can't match is handed to the team, or to VITE_ASSISTANT_ENDPOINT if an AI backend is added.
 export const ASSISTANT_ENDPOINT = import.meta.env.VITE_ASSISTANT_ENDPOINT;
 
 // Keywords are accent-free and lowercase. Keywords of 5+ characters also match inside longer
 // words (so "tailing" matches "tailings"); shorter ones must match a whole word.
 const INTENTS = [
-  { id: "esg-compliance", weight: 2, keywords: ["esg", "oecd", "ocde", "icglr", "cirgl", "traceab", "tracab", "due diligence", "diligence", "supply chain", "3tg", "chain of custody", "certification", "rcm", "conflict mineral", "responsible sourcing", "approvisionnement", "inkomoko", "urunana"] },
-  { id: "circular-economy", weight: 2, keywords: ["tailing", "waste", "recp", "esia", "emp", "acid mine", "amd", "rehabilit", "circular", "environment", "impact assessment", "residu", "dechet", "ibidukikije", "ibisigazwa", "imyanda"] },
-  { id: "tvet-workforce", weight: 2, keywords: ["training", "train", "tvet", "dacum", "cbet", "curricul", "skill", "workforce", "upskill", "ohs", "health and safety", "safety", "formation", "competence", "securite", "amahugurwa", "guhugura", "integanyanyigisho", "umutekano", "asm", "artisanal"] },
-  { id: "technical-advisory", weight: 2, keywords: ["feasib", "geotech", "mine plan", "planning", "rqd", "rmr", "slope", "stope", "fleet", "haulage", "processing", "recovery", "optimi", "simulation", "schedul", "faisabilite", "planification", "inyigo", "jewoteknike"] },
-  { id: "institutional-advisory", weight: 2, keywords: ["policy", "policies", "government", "ministry", "legal", "monitoring", "m&e", "donor", "value addition", "governance", "politique", "gouvernement", "bailleur", "politiki", "leta", "amategeko"] },
+  { id: "esg-compliance", weight: 2, keywords: ["esg", "oecd", "ocde", "icglr", "cirgl", "traceab", "tracab", "due diligence", "diligence", "supply chain", "3tg", "chain of custody", "certification", "rcm", "conflict mineral", "responsible sourcing", "approvisionnement", "inkomoko", "urunana", "ugavi", "ufuatiliaji", "uchunguzi wa kina"] },
+  { id: "circular-economy", weight: 2, keywords: ["tailing", "waste", "recp", "esia", "emp", "acid mine", "amd", "rehabilit", "circular", "environment", "impact assessment", "residu", "dechet", "ibidukikije", "ibisigazwa", "imyanda", "mabaki", "taka", "mazingira"] },
+  { id: "tvet-workforce", weight: 2, keywords: ["training", "train", "tvet", "dacum", "cbet", "curricul", "skill", "workforce", "upskill", "ohs", "health and safety", "safety", "formation", "competence", "securite", "amahugurwa", "guhugura", "integanyanyigisho", "umutekano", "asm", "artisanal", "mafunzo", "ujuzi", "mtaala", "mitaala", "usalama"] },
+  { id: "technical-advisory", weight: 2, keywords: ["feasib", "geotech", "mine plan", "planning", "rqd", "rmr", "slope", "stope", "fleet", "haulage", "processing", "recovery", "optimi", "simulation", "schedul", "faisabilite", "planification", "inyigo", "jewoteknike", "upembuzi", "mpango wa mgodi", "jioteknolojia"] },
+  { id: "institutional-advisory", weight: 2, keywords: ["policy", "policies", "government", "ministry", "legal", "monitoring", "m&e", "donor", "value addition", "governance", "politique", "gouvernement", "bailleur", "politiki", "leta", "amategeko", "sera", "serikali", "wizara", "sheria"] },
   // Price questions outrank the topic they're about ("how much is a feasibility study?").
-  { id: "proposal", weight: 3, keywords: ["price", "cost", "costs", "pricing", "fee", "fees", "rates", "budget", "how much", "devis", "prix", "tarif", "cout", "combien", "igiciro", "amafaranga"] },
-  { id: "proposal", weight: 1.6, keywords: ["proposal", "quote", "quotation", "hire", "offre", "saba serivisi"] },
-  { id: "careers", weight: 1.6, keywords: ["job", "jobs", "career", "vacanc", "hiring", "recruit", "employ", "internship", "cv", "emploi", "poste", "recrutement", "stage", "akazi", "imyanya"] },
-  { id: "projects", weight: 1.5, keywords: ["project", "portfolio", "client", "reference", "past work", "track record", "experience", "projet", "imishinga", "abakiriya"] },
-  { id: "founder", weight: 1.5, keywords: ["founder", "owner", "ceo", "director", "team", "expert", "consultant", "staff", "who runs", "fondateur", "directeur", "equipe", "uwashinze", "nyiri", "umuyobozi"] },
-  { id: "contact", weight: 1.5, keywords: ["contact", "email", "e mail", "mail", "phone", "call", "telephone", "number", "reach", "whatsapp", "numero", "courriel", "twandikire", "telefone", "nimero", "hamagara"] },
-  { id: "location", weight: 1.5, keywords: ["where", "located", "location", "office", "address", "kigali", "based", "adresse", "bureau", "situe", "aho", "ibiro", "mukorera"] },
-  { id: "hours", weight: 1.5, keywords: ["hours", "opening", "open", "weekend", "horaire", "ouvert", "amasaha"] },
-  { id: "human", weight: 1.5, keywords: ["human", "person", "agent", "real person", "someone", "speak", "talk", "humain", "personne", "umuntu", "kuvugana"] },
-  { id: "minerals", weight: 1.5, keywords: ["mineral", "tin", "tantalum", "tungsten", "gold", "lithium", "graphite", "coltan", "cassiterite", "wolfram", "minerai", "etain", "tantale", "tungstene", "amabuye", "gasegereti", "koluta", "zahabu"] },
-  { id: "sectors", weight: 1.5, keywords: ["oil", "gas", "petroleum", "energy", "quarry", "quarrying", "sector", "petrole", "energie", "carriere", "ingufu"] },
-  { id: "vision", weight: 1.5, keywords: ["vision", "icyerekezo"] },
-  { id: "mission", weight: 1.5, keywords: ["mission", "inshingano"] },
-  { id: "values", weight: 1.5, keywords: ["value", "values", "valeur", "principle", "indangagaciro"] },
-  { id: "about", weight: 1.2, keywords: ["who are you", "about", "company", "jd mining", "firm", "tell me", "entreprise", "cabinet", "qui etes", "abo muri bo", "ikigo"] },
-  { id: "services", weight: 1, keywords: ["service", "offer", "provide", "what do you do", "prestation", "serivisi", "mukora", "mutanga"] },
-  { id: "greeting", weight: 0.5, keywords: ["hello", "hi", "hey", "bonjour", "salut", "bonsoir", "muraho", "mwaramutse", "mwiriwe"] },
-  { id: "thanks", weight: 0.5, keywords: ["thank", "thanks", "merci", "murakoze", "urakoze"] },
+  { id: "proposal", weight: 3, keywords: ["price", "cost", "costs", "pricing", "fee", "fees", "rates", "budget", "how much", "devis", "prix", "tarif", "cout", "combien", "igiciro", "amafaranga", "bei", "gharama", "kiasi gani"] },
+  { id: "proposal", weight: 1.6, keywords: ["proposal", "quote", "quotation", "hire", "offre", "saba serivisi", "pendekezo", "nukuu"] },
+  { id: "careers", weight: 1.6, keywords: ["job", "jobs", "career", "vacanc", "hiring", "recruit", "employ", "internship", "cv", "emploi", "poste", "recrutement", "stage", "akazi", "imyanya", "kazi", "ajira", "nafasi"] },
+  { id: "projects", weight: 1.5, keywords: ["project", "portfolio", "client", "reference", "past work", "track record", "experience", "projet", "imishinga", "abakiriya", "mradi", "miradi", "wateja"] },
+  { id: "founder", weight: 1.5, keywords: ["founder", "owner", "ceo", "director", "team", "expert", "consultant", "staff", "who runs", "fondateur", "directeur", "equipe", "uwashinze", "nyiri", "umuyobozi", "mwanzilishi", "mkurugenzi", "timu"] },
+  { id: "contact", weight: 1.5, keywords: ["contact", "email", "e mail", "mail", "phone", "call", "telephone", "number", "reach", "whatsapp", "numero", "courriel", "twandikire", "telefone", "nimero", "hamagara", "mawasiliano", "simu", "barua pepe", "namba"] },
+  { id: "location", weight: 1.5, keywords: ["where", "located", "location", "office", "address", "kigali", "based", "adresse", "bureau", "situe", "aho", "ibiro", "mukorera", "wapi", "ofisi", "anwani", "mahali"] },
+  { id: "hours", weight: 1.5, keywords: ["hours", "opening", "open", "weekend", "horaire", "ouvert", "amasaha", "saa za kazi", "wazi"] },
+  { id: "human", weight: 1.5, keywords: ["human", "person", "agent", "real person", "someone", "speak", "talk", "humain", "personne", "umuntu", "kuvugana", "mtu", "binadamu", "ongea"] },
+  { id: "minerals", weight: 1.5, keywords: ["mineral", "tin", "tantalum", "tungsten", "gold", "lithium", "graphite", "coltan", "cassiterite", "wolfram", "minerai", "etain", "tantale", "tungstene", "amabuye", "gasegereti", "koluta", "zahabu", "madini", "bati", "dhahabu"] },
+  { id: "sectors", weight: 1.5, keywords: ["oil", "gas", "petroleum", "energy", "quarry", "quarrying", "sector", "petrole", "energie", "carriere", "ingufu", "nishati", "machimbo", "sekta"] },
+  { id: "future", weight: 2, keywords: ["ai", "artificial intelligence", "machine learning", "dashboard", "portal", "future", "roadmap", "ia", "intelligence artificielle", "futur", "ubwenge bw ubukorano", "akili bandia", "ai tool"] },
+  { id: "mandate", weight: 1.6, keywords: ["mandate", "mandat", "mamlaka", "directive", "stakeholder", "accountabilit"] },
+  { id: "vision", weight: 1.5, keywords: ["vision", "icyerekezo", "dira"] },
+  { id: "mission", weight: 1.5, keywords: ["mission", "inshingano", "dhamira"] },
+  { id: "values", weight: 1.5, keywords: ["value", "values", "valeur", "principle", "indangagaciro", "maadili"] },
+  { id: "about", weight: 1.2, keywords: ["who are you", "about", "company", "jd mining", "firm", "tell me", "entreprise", "cabinet", "qui etes", "abo muri bo", "ikigo", "kampuni", "nyinyi ni nani"] },
+  { id: "services", weight: 1, keywords: ["service", "offer", "provide", "what do you do", "prestation", "serivisi", "mukora", "mutanga", "huduma", "mnatoa"] },
+  { id: "greeting", weight: 0.5, keywords: ["hello", "hi", "hey", "bonjour", "salut", "bonsoir", "muraho", "mwaramutse", "mwiriwe", "habari", "jambo", "hujambo", "mambo", "salaam"] },
+  { id: "thanks", weight: 0.5, keywords: ["thank", "thanks", "merci", "murakoze", "urakoze", "asante", "ahsante"] },
 ];
 
 function normalize(text) {
@@ -57,7 +59,7 @@ export function detectIntent(text) {
   return best.id;
 }
 
-const fill = (template) => template.replace("{phone}", company.phone).replace("{email}", company.email);
+const fill = (template) => template.replace("{phone}", company.phone).replace("{email}", company.email).replace("{address}", company.address);
 
 function teamLinks(t, question) {
   const a = t.assistant;
@@ -94,17 +96,25 @@ export function buildReply(intent, t, question) {
     case "contact":
       return { text: fill(r.contact), links: [...teamLinks(t), { label: company.phone, href: phoneHref }, { label: a.links.contact, to: "/contact" }] };
     case "location":
-      return { text: r.location, links: teamLinks(t) };
+      return { text: fill(r.location), links: teamLinks(t) };
     case "hours":
       return { text: r.hours, links: teamLinks(t) };
     case "human":
       return { text: r.human, links: [...teamLinks(t, question), { label: company.phone, href: phoneHref }] };
+    case "mandate":
+      return { text: r.mandate, list: t.mandatePage.scope.map((item) => item.title), links: [{ label: a.links.mandate, to: "/mandate" }] };
+    case "future":
+      return {
+        text: r.future,
+        list: t.servicesPage.futureGroups.flatMap((group) => group.items.map((item) => item.title)),
+        links: [{ label: a.links.future, to: "/services#future" }],
+      };
     case "vision":
-      return { text: r.vision, quote: t.common.visionText, list: t.common.visionPoints.map((point) => point.title), links: [{ label: a.links.about, to: "/about" }] };
+      return { text: r.vision, quote: t.common.visionText, list: t.common.visionPoints.map((point) => point.title), links: [{ label: a.links.mandate, to: "/mandate" }] };
     case "mission":
-      return { text: r.mission, quote: t.common.missionText, list: t.common.missionPoints.map((point) => point.title), links: [{ label: a.links.about, to: "/about" }] };
+      return { text: r.mission, quote: t.common.missionText, list: t.common.missionPoints.map((point) => point.title), links: [{ label: a.links.mandate, to: "/mandate" }] };
     case "values":
-      return { text: r.values, list: t.about.values.map((value) => value.title), links: [{ label: a.links.about, to: "/about" }] };
+      return { text: r.values, list: t.about.values.map((value) => value.title), links: [{ label: a.links.mandate, to: "/mandate" }] };
     case "about":
       return { text: t.about.p1, links: [{ label: a.links.about, to: "/about" }, { label: a.links.services, to: "/services" }] };
     case "founder":

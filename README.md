@@ -1,11 +1,11 @@
 # JD Mining Consulting Ltd — Website
 
-Marketing website for **JD Mining Consulting Ltd**, a Rwanda-based advisory and engineering firm serving the mining, quarrying and energy sectors across East and Central Africa.
+Marketing website for **JD MINING CONSULTING**, a Rwanda-based advisory and engineering firm serving the mining, quarrying and energy sectors across East and Central Africa.
 
 ## Highlights
 
 - **Scroll-driven 3D hero:** a real-time underground mine scene (miners, ore-bearing rock face, timber-framed tunnel, ore cart, sparks). Scrolling flies the camera from the rock face down the tunnel toward the light, with a message at each stage. Clicking anywhere on the scene makes the miner strike the rock.
-- **Three languages:** English, Français and Kinyarwanda, chosen from the navbar language menu (the choice is remembered).
+- **Four languages:** English, Français, Kinyarwanda and Kiswahili, chosen from the always-visible switch in the header (the choice is remembered).
 - **Five service pillars:** each with an animated illustration and its own detail page.
 - **Interactive sections:** "How we work" timeline, flip-card mineral tiles (Sn, Ta, W, Au, Li, C), results cards and audience cards.
 - **Contact page:** a guided three-step form (topic cards, details, message) and a one-click copy of the email address.
@@ -45,7 +45,7 @@ src/
   data/         Service pillar order
 ```
 
-All user-facing text lives in `src/i18n/translations.js`. Add any new string in all three languages.
+All user-facing text lives in `src/i18n/translations.js`. Add any new string in all four languages (`npm run i18n:check`).
 
 ## Deployment (Vercel)
 

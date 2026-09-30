@@ -5,7 +5,7 @@ import { serviceSlugs } from "./services.js";
 export const projectStatuses = ["ongoing", "completed"];
 export const updateCategories = ["company", "insights", "technical", "esg", "training", "projects", "events"];
 
-// Text may be a plain string or { en, fr, rw } with at least the English version.
+// Text may be a plain string or { en, fr, rw, sw } with at least the English version.
 function checkText(report, field, value, required = true) {
   if (value === null || value === undefined || value === "") {
     if (required) report(`"${field}" is missing`);

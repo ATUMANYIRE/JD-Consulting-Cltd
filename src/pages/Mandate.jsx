@@ -7,7 +7,6 @@ import Placeholder from "../components/Placeholder";
 import { staggerItem } from "../components/variants";
 import { StrataIllustration } from "../components/illustrations";
 import { useLanguage } from "../i18n/context";
-import { company } from "../data/company";
 
 // One stratum of the core sample per value, top to bottom.
 const STRATA = [
@@ -138,6 +137,89 @@ function CoreValues() {
   );
 }
 
+function SectionHead({ number, title, intro }) {
+  return (
+    <Reveal>
+      <div className="flex items-baseline gap-4">
+        <span className="font-display text-sm font-bold text-orange">{String(number).padStart(2, "0")}</span>
+        <h3 className="text-2xl font-bold text-navy sm:text-3xl">{title}</h3>
+      </div>
+      {intro && <p className="mt-4 max-w-3xl text-lg text-navy/70">{intro}</p>}
+    </Reveal>
+  );
+}
+
+// The client's corporate mandate, shown word for word in English.
+function CorporateMandate() {
+  const { t } = useLanguage();
+  const m = t.mandatePage;
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6">
+      <Reveal>
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange">{m.statementEyebrow}</p>
+        <h2 className="mt-3 text-3xl font-bold text-navy sm:text-4xl">{m.statementTitle}</h2>
+        <p className="mt-3 font-display text-lg text-navy/60">{m.statementSubtitle}</p>
+      </Reveal>
+
+      <div className="mt-14">
+        <SectionHead number={1} title={m.scopeTitle} intro={m.scopeIntro} />
+        <Stagger className="mt-8 grid gap-4 md:grid-cols-3">
+          {m.scope.map((item, i) => (
+            <motion.div key={item.title} variants={staggerItem} className="relative overflow-hidden rounded-3xl border-2 border-navy/10 bg-white p-7">
+              <span className="absolute inset-x-0 top-0 h-1.5" style={{ background: STRATA[i * 2].fill }} />
+              <h4 className="font-display text-lg font-bold leading-snug text-navy">{item.title}</h4>
+              <p className="mt-3 text-navy/70">{item.text}</p>
+            </motion.div>
+          ))}
+        </Stagger>
+      </div>
+
+      <div className="mt-20">
+        <SectionHead number={2} title={m.directivesTitle} intro={m.directivesIntro} />
+        <Stagger as="ol" className="mt-8 space-y-3">
+          {m.directives.map((directive, i) => (
+            <motion.li key={directive.title} variants={staggerItem} className="grid overflow-hidden rounded-3xl border-2 border-navy/10 bg-white sm:grid-cols-[11rem_1fr]">
+              <div className="flex items-center gap-3 px-6 py-4 sm:flex-col sm:items-start sm:justify-center sm:py-6" style={{ background: STRATA[i].fill }}>
+                <span className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: STRATA[i].vein }}>
+                  {t.common.pillar}
+                </span>
+                <span className="font-display text-3xl font-bold leading-none" style={{ color: STRATA[i].vein }}>
+                  {i + 1}
+                </span>
+              </div>
+              <div className="p-6">
+                <h4 className="font-display text-lg font-bold text-navy">{directive.title}</h4>
+                <ul className="mt-3 space-y-2">
+                  {directive.points.map((point) => (
+                    <li key={point} className="flex gap-3 text-navy/75">
+                      <span className="mt-2 h-2 w-2 flex-none rotate-45 bg-orange" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.li>
+          ))}
+        </Stagger>
+      </div>
+
+      <div className="mt-20">
+        <SectionHead number={3} title={m.stakeholdersTitle} />
+        <Stagger className="mt-8 grid gap-4 md:grid-cols-3">
+          {m.stakeholders.map((item) => (
+            <motion.div key={item.title} variants={staggerItem} className="rounded-3xl bg-navy p-7 text-white">
+              <span className="text-2xl text-orange">→</span>
+              <h4 className="mt-3 font-display text-lg font-bold leading-snug">{item.title}</h4>
+              <p className="mt-3 text-white/70">{item.text}</p>
+            </motion.div>
+          ))}
+        </Stagger>
+      </div>
+    </section>
+  );
+}
+
 export default function Mandate() {
   const { t } = useLanguage();
   const m = t.mandatePage;
@@ -150,16 +232,9 @@ export default function Mandate() {
         </div>
       </PageHero>
 
-      <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6">
-        <Reveal className="rounded-3xl border-2 border-navy/10 p-7 sm:p-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-orange">{m.statementEyebrow}</p>
-          <div className="mt-4 max-w-3xl font-display text-xl text-navy">
-            {company.mandate ? <p>{company.mandate}</p> : <Placeholder label={m.statementPending} />}
-          </div>
-        </Reveal>
-      </section>
+      <CorporateMandate />
 
-      <section className="mx-auto max-w-6xl px-4 pt-16 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 pt-20 sm:px-6">
         <VisionMission />
       </section>
 

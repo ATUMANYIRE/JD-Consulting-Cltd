@@ -1,8 +1,57 @@
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import PageHero from "../components/PageHero";
-import { Reveal, TiltCard } from "../components/motion";
+import NavyPattern from "../components/NavyPattern";
+import { Reveal, Stagger, TiltCard } from "../components/motion";
+import { staggerItem } from "../components/variants";
 import { ServiceIllustration } from "../components/illustrations";
 import { useLanguage, useServices } from "../i18n/context";
+
+// Tools the client has asked to show as planned, not as current services: every card carries the
+// "future development" badge and nothing links to a working tool.
+function FutureDevelopments() {
+  const { t } = useLanguage();
+  const s = t.servicesPage;
+
+  return (
+    <section id="future" className="scroll-mt-24 px-4 pb-24 sm:px-6">
+      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-3xl bg-navy px-6 py-14 text-white *:relative sm:px-10 sm:py-16">
+        <NavyPattern />
+        <Reveal className="max-w-2xl">
+          <p className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-orange">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-orange" />
+            {s.futureEyebrow}
+          </p>
+          <h2 className="mt-4 text-3xl font-bold sm:text-4xl">{s.futureTitle}</h2>
+          <p className="mt-4 text-white/70">{s.futureText}</p>
+        </Reveal>
+
+        <div className="mt-12 grid gap-5 md:grid-cols-2">
+          {s.futureGroups.map((group, g) => (
+            <Reveal key={group.title} delay={0.08 * g} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm sm:p-7">
+              <div className="flex items-start gap-4">
+                <span className="font-display text-3xl font-bold leading-none text-orange/80">{String(g + 1).padStart(2, "0")}</span>
+                <h3 className="pt-1 font-display text-lg font-bold leading-snug">{group.title}</h3>
+              </div>
+              <Stagger as="ul" className="mt-6 space-y-4">
+                {group.items.map((item) => (
+                  <motion.li key={item.title} variants={staggerItem} className="rounded-2xl border border-dashed border-white/20 p-5 transition-colors hover:border-orange/60">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-orange/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-orange">
+                      <span className="h-1.5 w-1.5 rounded-full bg-orange" />
+                      {s.futureBadge}
+                    </span>
+                    <p className="mt-3 font-semibold text-white">{item.title}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-white/65">{item.text}</p>
+                  </motion.li>
+                ))}
+              </Stagger>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function Services() {
   const { t } = useLanguage();
@@ -16,7 +65,8 @@ export default function Services() {
         </div>
       </PageHero>
 
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+      {/* overflow-x-clip: the side-in reveals start off-screen and must not widen the page on phones. */}
+      <section className="mx-auto max-w-6xl overflow-x-clip px-4 py-12 sm:px-6">
         {services.map((service, index) => {
           const flipped = index % 2 === 1;
           return (
@@ -47,6 +97,8 @@ export default function Services() {
           );
         })}
       </section>
+
+      <FutureDevelopments />
     </>
   );
 }

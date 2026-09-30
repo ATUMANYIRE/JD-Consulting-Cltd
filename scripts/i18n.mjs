@@ -1,6 +1,6 @@
 // Translation helpers for native-speaker review.
-//   node scripts/i18n.mjs check   → lists keys missing from French or Kinyarwanda (exit 1 if any)
-//   node scripts/i18n.mjs export  → writes translations-review.csv (key, en, fr, rw) for a reviewer
+//   node scripts/i18n.mjs check   → lists keys missing from French, Kinyarwanda or Swahili (exit 1 if any)
+//   node scripts/i18n.mjs export  → writes translations-review.csv (key, en, fr, rw, sw) for a reviewer
 import { writeFileSync } from "node:fs";
 import { translations } from "../src/i18n/translations.js";
 
@@ -36,7 +36,8 @@ if (mode === "check") {
 
 if (mode === "export") {
   const cell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-  const rows = [["key", "en", "fr", "rw"], ...keys.map((key) => [key, flat.en[key], flat.fr[key], flat.rw[key]])];
+  const langs = Object.keys(flat);
+  const rows = [["key", ...langs], ...keys.map((key) => [key, ...langs.map((lang) => flat[lang][key])])];
   writeFileSync("translations-review.csv", "﻿" + rows.map((row) => row.map(cell).join(",")).join("\r\n"));
   console.log(`Wrote translations-review.csv (${keys.length} strings)`);
 }

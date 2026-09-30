@@ -34,7 +34,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-40">
       <div className={`border-b bg-white/95 backdrop-blur transition-shadow ${scrolled ? "border-navy/10 shadow-[0_10px_30px_-18px_rgba(14,41,62,0.5)]" : "border-transparent"}`}>
-        <nav className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+        <nav className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:gap-3 xl:gap-4">
           <Link to="/" aria-label={company.legalName} className="group">
             <Logo />
           </Link>
@@ -46,7 +46,7 @@ export default function Navbar() {
                 to={link.to}
                 end={link.to === "/"}
                 className={({ isActive }) =>
-                  `group relative px-2 py-2 whitespace-nowrap text-[13px] font-semibold xl:px-3 xl:text-sm transition-colors ${isActive ? "text-navy" : "text-navy/55 hover:text-navy"}`
+                  `group relative px-1.5 py-2 whitespace-nowrap text-[13px] font-semibold xl:px-3 xl:text-sm transition-colors ${isActive ? "text-navy" : "text-navy/55 hover:text-navy"}`
                 }
               >
                 {({ isActive }) => (
@@ -149,7 +149,7 @@ export default function Navbar() {
             <div className="mt-auto space-y-5 pt-8">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/40">{t.nav.language}</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {languages.map((language) => {
                     const active = language.code === lang;
                     return (

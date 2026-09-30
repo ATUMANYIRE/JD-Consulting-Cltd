@@ -1,7 +1,8 @@
 import { company } from "../data/company";
 
-// The gear is engineering, the peaks and the pick-swoosh are mining, the leaves are the
-// environment and the three figures are communities. `public/favicon.svg` is the same mark.
+// The gear is engineering; the peaks and the geological hammer (the curved handle with its head at
+// the top right, the worldwide symbol of mining: the client confirmed it is not a pickaxe) are
+// mining; the leaves are the environment and the three figures are communities. `public/favicon.svg` is the same mark.
 const TONES = {
   navy: { ink: "#0E293E", leaf: "#2F8F5B", cut: "#ffffff", text: "text-navy" },
   white: { ink: "#ffffff", leaf: "#5CC08A", cut: "#0E293E", text: "text-white" },

@@ -124,27 +124,6 @@ function DrillBody({ steelRef, spinRef, bitRef }) {
   );
 }
 
-function Hoses() {
-  // Air and water lines run from the drill's backhead, across the rails, to the manifold on the wall.
-  const [airTube, waterTube] = useMemo(() => {
-    const tube = (points, radius) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p))), 160, radius, 8, false);
-    return [
-      tube([[1.53, 1.1, 0.35], [1.48, 0.7, 0.46], [1.35, 0.06, 0.7], [0.7, 0.05, 1.15], [0.1, 0.14, 1.38], [-0.6, 0.05, 1.55], [-2.4, 0.05, 1.3], [-3.7, 0.08, 0.7], [-4.3, 0.6, 0.4]], 0.026),
-      tube([[1.54, 1.1, 0.33], [1.52, 0.72, 0.4], [1.42, 0.05, 0.62], [0.8, 0.04, 1.02], [0.12, 0.13, 1.27], [-0.5, 0.04, 1.44], [-2.3, 0.04, 1.18], [-3.6, 0.07, 0.58], [-4.3, 0.5, 0.3]], 0.017),
-    ];
-  }, []);
-  return (
-    <Shadowed receive={false}>
-      <mesh geometry={airTube}>
-        <meshStandardMaterial color="#10171c" roughness={0.7} />
-      </mesh>
-      <mesh geometry={waterTube}>
-        <meshStandardMaterial color="#3d6f96" roughness={0.6} />
-      </mesh>
-    </Shadowed>
-  );
-}
-
 // Spray-painted drill pattern on the face; a hole appears once it has been drilled.
 function HoleMarks({ marks, drilled }) {
   return (
@@ -326,7 +305,6 @@ export default function DrillingRig({ rockRef }) {
         </Shadowed>
         <pointLight position={[0, 1.3, 1.1]} color={AMBER} intensity={1.2} distance={2.5} decay={2} />
       </group>
-      <Hoses />
       <HoleMarks marks={marks} drilled={drilled} />
     </>
   );

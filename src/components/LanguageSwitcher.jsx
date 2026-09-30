@@ -20,7 +20,7 @@ export default function LanguageSwitcher({ tone = "light", className = "" }) {
             title={language.name}
             aria-label={language.name}
             onClick={() => setLang(language.code)}
-            className={`relative h-8 min-w-11 rounded-full px-2.5 text-xs lg:min-w-9 lg:px-2 xl:min-w-11 xl:px-2.5 font-bold tracking-wide transition-colors ${
+            className={`relative h-8 min-w-11 rounded-full px-2.5 text-xs lg:min-w-8 lg:px-1.5 xl:min-w-11 xl:px-2.5 font-bold tracking-wide transition-colors ${
               active ? (dark ? "text-navy" : "text-white") : dark ? "text-white/70 hover:text-white" : "text-navy/60 hover:text-navy"
             }`}
           >
