@@ -25,3 +25,7 @@ dist-ssr
 
 # Generated for translation review
 translations-review.csv
+
+# Local editor data from `npm run dev` (accounts, sessions, content)
+.local-admin
+public/media/

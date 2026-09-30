@@ -7,12 +7,11 @@ import { translations } from "../i18n/translations";
 import { serviceSlugs } from "../data/services";
 import { updateCategories } from "../data/schema";
 
-// The owner's private editor for Projects and Updates. There is no login: the private link carries a
-// secret key (/admin#key=…), which is kept in this browser and checked by /api/content on every save.
-// Owner-facing, so English only.
+// The owner's editor for Projects and Updates. Administrators sign in with an email and password
+// (/api/auth); accounts are created with the setup code the developer gives the owner. Saves go
+// to the content database and are live on the website straight away. Owner-facing, so English only.
 
-const KEY_STORAGE = "jd-admin-key";
-const MAX_NEW_PHOTOS = 6;
+const MAX_ITEMS = 12;
 const CATEGORY_LABELS = {
   company: "Company update",
   insights: "Industry insight",
@@ -22,25 +21,14 @@ const CATEGORY_LABELS = {
   projects: "Project update",
   events: "Event",
 };
+const VIDEO_TYPES = "video/mp4,video/webm,video/quicktime";
+const MAX_VIDEO_MB = 250;
+const VIDEO_LINK = /^https:\/\/(www\.)?(youtube\.com\/watch\?v=[\w-]{6,}|youtu\.be\/[\w-]{6,}|vimeo\.com\/\d+)/;
 
-function readKey() {
-  try {
-    const fromLink = new URLSearchParams(window.location.hash.slice(1)).get("key");
-    if (fromLink) {
-      localStorage.setItem(KEY_STORAGE, fromLink);
-      window.history.replaceState(null, "", "/admin");
-      return fromLink;
-    }
-    return localStorage.getItem(KEY_STORAGE) ?? "";
-  } catch {
-    return new URLSearchParams(window.location.hash.slice(1)).get("key") ?? "";
-  }
-}
-
-async function api(key, method, body) {
-  const response = await fetch("/api/content", {
+async function api(path, method = "GET", body) {
+  const response = await fetch(path, {
     method,
-    headers: { "x-admin-key": key, ...(body ? { "Content-Type": "application/json" } : {}) },
+    headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
   let data = null;
@@ -49,10 +37,9 @@ async function api(key, method, body) {
   } catch {
     // not JSON: an HTML page came back, so the editor server isn't deployed here
   }
-  if (response.ok && !data) throw new Error("The editor server isn't available here. It only works on the live website once it has been set up.");
-  data ??= {};
+  if (!data) throw new Error("The editor server isn't available here. It works on the live website, or under npm run dev.");
   if (!response.ok) {
-    const error = new Error(data.error ?? (response.status === 404 ? "The editor server isn't available here. It only works on the live website." : `Server error (${response.status}).`));
+    const error = new Error(data.error ?? `Server error (${response.status}).`);
     error.problems = data.problems;
     error.status = response.status;
     throw error;
@@ -60,27 +47,101 @@ async function api(key, method, body) {
   return data;
 }
 
-async function getContent(key) {
-  const data = await api(key, "GET");
+async function getContent() {
+  const data = await api("/api/content");
   if (!Array.isArray(data.projects) || !Array.isArray(data.updates)) throw new Error("The editor server sent an unexpected reply. Try again in a moment.");
   return data;
 }
 
-// Shrink photos in the browser (max 1600 px, JPEG) so uploads stay small and fast on mobile data.
-async function compress(file) {
+// Automatic photo enhancement (no AI, and nothing leaves the browser): stretch the levels so the
+// darkest and brightest 0.5% become near black and white, correct half of any colour cast
+// (grey-world), lift dark photos slightly, and add a touch of saturation. Always optional.
+function enhancePixels(data) {
+  const n = data.length / 4;
+  const lumaHist = new Uint32Array(256);
+  const sums = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) {
+    lumaHist[(data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8]++;
+    sums[0] += data[i];
+    sums[1] += data[i + 1];
+    sums[2] += data[i + 2];
+  }
+  const percentile = (p) => {
+    let count = 0;
+    for (let v = 0; v < 256; v++) if ((count += lumaHist[v]) >= p * n) return v;
+    return 255;
+  };
+  // Never stretch harder than these bounds, so a deliberately dark or bright photo stays natural.
+  const lo = Math.min(percentile(0.005), 60);
+  const hi = Math.max(percentile(0.995), 190);
+  const means = sums.map((sum) => sum / n);
+  const grey = (means[0] + means[1] + means[2]) / 3;
+  const balance = means.map((mean) => Math.min(1.15, Math.max(0.87, 1 + 0.5 * (grey / Math.max(mean, 1) - 1))));
+  const gamma = (grey - lo) / Math.max(hi - lo, 1) < 0.4 ? 0.85 : 1;
+  const lut = balance.map((factor) => Uint8ClampedArray.from({ length: 256 }, (_, v) => 255 * Math.pow(Math.min(1, Math.max(0, (v * factor - lo) / (hi - lo))), gamma)));
+  for (let i = 0; i < data.length; i += 4) {
+    const r = lut[0][data[i]];
+    const g = lut[1][data[i + 1]];
+    const b = lut[2][data[i + 2]];
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    data[i] = y + (r - y) * 1.08;
+    data[i + 1] = y + (g - y) * 1.08;
+    data[i + 2] = y + (b - y) * 1.08;
+  }
+}
+
+// Shrink photos in the browser (max 1600 px, JPEG) so uploads stay small and fast on mobile data,
+// and prepare the enhanced version next to the original so the owner can compare them.
+async function preparePhoto(file) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
-  const data = await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1]);
-    reader.readAsDataURL(blob);
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const toBlob = () => new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+  const original = await toBlob();
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  enhancePixels(pixels.data);
+  context.putImageData(pixels, 0, 0);
+  const enhanced = await toBlob();
+  return {
+    kind: "image",
+    original: { blob: original, preview: URL.createObjectURL(original) },
+    enhanced: { blob: enhanced, preview: URL.createObjectURL(enhanced) },
+    enhance: true,
+    alt: "",
+    caption: "",
+  };
+}
+
+const isNew = (item) => Boolean(item.original || item.video);
+const previewOf = (item) => (item.kind === "image" ? (item.original ? (item.enhance ? item.enhanced : item.original).preview : item.src) : item.video?.preview ?? item.src);
+
+// Sends one new photo or video and returns its public address. On Vercel the file goes straight
+// to Blob storage; under `npm run dev` it is written to public/media/.
+async function uploadFile(item, folder, mode, onProgress) {
+  const { blob } = item.kind === "image" ? (item.enhance ? item.enhanced : item.original) : item.video;
+  const contentType = blob.type || "image/jpeg";
+  if (mode === "local") {
+    const response = await fetch(`/api/upload?folder=${folder}`, { method: "POST", headers: { "Content-Type": contentType }, body: blob });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error ?? "Upload failed.");
+    onProgress(100);
+    return data.url;
+  }
+  const { upload } = await import("@vercel/blob/client");
+  const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov" }[contentType] ?? "bin";
+  const result = await upload(`media/${folder}/${item.kind}.${ext}`, blob, {
+    access: "public",
+    handleUploadUrl: "/api/upload",
+    clientPayload: JSON.stringify({ contentType }),
+    contentType,
+    multipart: blob.size > 20 * 1024 * 1024,
+    onUploadProgress: ({ percentage }) => onProgress(percentage),
   });
-  return { contentType: "image/jpeg", data, preview: URL.createObjectURL(blob) };
+  return result.url;
 }
 
 // Optional translations of an entry's text; English is always required.
@@ -107,7 +168,7 @@ function toForm(type, entry) {
       clientPermission: Boolean(entry?.client),
       description: L(entry?.description),
       outcomes: entry?.outcomes?.length ? entry.outcomes.map(plain) : [""],
-      media: (entry?.media ?? []).map((item) => ({ src: item.src, alt: item.alt ?? "", caption: item.caption ?? "" })),
+      media: (entry?.media ?? []).map((item) => ({ kind: item.type === "video" ? "video" : "image", src: item.src, alt: item.alt ?? "", caption: item.caption ?? "" })),
     };
   }
   return {
@@ -117,41 +178,40 @@ function toForm(type, entry) {
     title: L(entry?.title),
     summary: L(entry?.summary),
     url: entry?.url ?? "",
-    media: entry?.cover ? [{ src: entry.cover.src, alt: entry.cover.alt ?? "", caption: "" }] : [],
+    media: entry?.cover ? [{ kind: "image", src: entry.cover.src, alt: entry.cover.alt ?? "", caption: "" }] : [],
   };
 }
 
-function toRequest(type, form) {
-  const uploads = [];
-  const media = form.media.map((item) => {
-    if (!item.upload) return { type: "image", src: item.src, alt: item.alt.trim(), ...(item.caption.trim() ? { caption: item.caption.trim() } : {}) };
-    uploads.push({ contentType: item.upload.contentType, data: item.upload.data });
-    return { type: "image", src: `upload:${uploads.length - 1}`, alt: item.alt.trim(), ...(item.caption.trim() ? { caption: item.caption.trim() } : {}) };
-  });
-  const entry =
-    type === "projects"
-      ? {
-          id: form.id ?? undefined,
-          name: fromL(form.name),
-          location: form.location.trim(),
-          year: Number(form.year),
-          status: form.status,
-          service: form.service,
-          client: form.client.trim() || undefined,
-          description: fromL(form.description),
-          outcomes: form.outcomes.map((item) => item.trim()).filter(Boolean),
-          media,
-        }
-      : {
-          id: form.id ?? undefined,
-          date: form.date,
-          category: form.category,
-          title: fromL(form.title),
-          summary: fromL(form.summary),
-          url: form.url.trim() || undefined,
-          cover: media[0],
-        };
-  return { entry, uploads };
+// `uploaded` maps each new photo or video to the address it was uploaded to.
+function toRequest(type, form, uploaded) {
+  const media = form.media.map((item) => ({
+    type: item.kind,
+    src: uploaded.get(item) ?? item.src,
+    ...(item.alt.trim() ? { alt: item.alt.trim() } : {}),
+    ...(item.caption.trim() ? { caption: item.caption.trim() } : {}),
+  }));
+  return type === "projects"
+    ? {
+        id: form.id ?? undefined,
+        name: fromL(form.name),
+        location: form.location.trim(),
+        year: Number(form.year),
+        status: form.status,
+        service: form.service,
+        client: form.client.trim() || undefined,
+        description: fromL(form.description),
+        outcomes: form.outcomes.map((item) => item.trim()).filter(Boolean),
+        media,
+      }
+    : {
+        id: form.id ?? undefined,
+        date: form.date,
+        category: form.category,
+        title: fromL(form.title),
+        summary: fromL(form.summary),
+        url: form.url.trim() || undefined,
+        cover: media[0],
+      };
 }
 
 const inputClass =
@@ -177,6 +237,9 @@ function Icon({ name, className = "h-4 w-4" }) {
     close: "M6 6l12 12M18 6L6 18",
     project: "M3 20l6-11 4 6 3-4 5 9H3zM15 6.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z",
     news: "M5 4h11v16H5zM16 8h3v10a2 2 0 0 1-2 2M8 8h5M8 12h5M8 16h3",
+    play: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM10 8.5v7l5.5-3.5z",
+    logout: "M15 17l5-5-5-5M20 12H9M11 20H5V4h6",
+    user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
   };
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -308,29 +371,65 @@ function Toggle({ checked, onChange, children }) {
   );
 }
 
-function Photos({ media, onChange, single }) {
-  const [busy, setBusy] = useState(false);
-  const newCount = media.filter((item) => item.upload).length;
-  const limit = single ? 1 : 12;
+function MediaThumb({ item }) {
+  if (item.kind === "image") return <img src={previewOf(item)} alt="" className="aspect-[16/10] w-full bg-navy/5 object-cover" />;
+  if (item.video) return <video src={item.video.preview} muted playsInline preload="metadata" className="aspect-[16/10] w-full bg-navy object-cover" />;
+  return (
+    <div className="grid aspect-[16/10] w-full place-items-center bg-navy text-white">
+      <span className="flex flex-col items-center gap-2 px-4 text-center">
+        <Icon name="play" className="h-10 w-10 text-orange" />
+        <span className="max-w-full truncate text-xs text-white/60">{item.src}</span>
+      </span>
+    </div>
+  );
+}
 
-  async function add(event) {
-    const files = [...event.target.files].slice(0, Math.max(0, Math.min(limit - media.length, MAX_NEW_PHOTOS - newCount)));
+// Photos (resized and optionally enhanced in the browser) and, for projects, videos: a file from
+// the phone or computer, or a YouTube / Vimeo link. Files are uploaded when the owner saves.
+function Media({ media, onChange, single, allowVideo }) {
+  const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState("");
+  const [linkError, setLinkError] = useState("");
+  const [fileError, setFileError] = useState("");
+  const limit = single ? 1 : MAX_ITEMS;
+  const room = Math.max(0, limit - media.length);
+
+  async function addPhotos(event) {
+    const files = [...event.target.files].slice(0, room);
     event.target.value = "";
     if (!files.length) return;
     setBusy(true);
+    setFileError("");
     try {
       const added = [];
-      for (const file of files) {
-        const upload = await compress(file);
-        added.push({ upload, preview: upload.preview, alt: "", caption: "" });
-      }
+      for (const file of files) added.push(await preparePhoto(file));
       onChange([...media, ...added]);
+    } catch {
+      setFileError("One of the photos could not be read. Try a JPEG or PNG.");
     } finally {
       setBusy(false);
     }
   }
 
+  function addVideo(event) {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (!file || !room) return;
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) return setFileError(`Videos must be smaller than ${MAX_VIDEO_MB} MB. Shorten it, or upload it to YouTube and paste the link.`);
+    setFileError("");
+    onChange([...media, { kind: "video", video: { blob: file, preview: URL.createObjectURL(file) }, alt: "", caption: "" }]);
+  }
+
+  function addLink() {
+    const url = link.trim();
+    if (!VIDEO_LINK.test(url)) return setLinkError("Paste a YouTube or Vimeo address, e.g. https://www.youtube.com/watch?v=…");
+    setLinkError("");
+    setLink("");
+    onChange([...media, { kind: "video", src: url, alt: "", caption: "" }]);
+  }
+
   const update = (i, patch) => onChange(media.map((item, j) => (j === i ? { ...item, ...patch } : item)));
+  const tile = "flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-navy/20 bg-[#f7f9fb] px-4 py-8 text-center transition hover:border-orange hover:bg-orange/5";
 
   return (
     <div>
@@ -338,7 +437,7 @@ function Photos({ media, onChange, single }) {
         <AnimatePresence initial={false}>
           {media.map((item, i) => (
             <motion.div
-              key={item.src ?? item.preview}
+              key={item.src ?? item.original?.preview ?? item.video?.preview}
               layout
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -346,40 +445,91 @@ function Photos({ media, onChange, single }) {
               className="overflow-hidden rounded-2xl border-2 border-navy/10 bg-white"
             >
               <div className="relative">
-                <img src={item.preview ?? item.src} alt="" className="aspect-[16/10] w-full bg-navy/5 object-cover" />
-                {i === 0 && !single && <span className="absolute left-2 top-2 rounded-full bg-navy/85 px-2.5 py-1 text-[11px] font-semibold text-white">Main photo</span>}
+                <MediaThumb item={item} />
+                {i === 0 && !single && <span className="absolute left-2 top-2 rounded-full bg-navy/85 px-2.5 py-1 text-[11px] font-semibold text-white">Main {item.kind === "video" ? "video" : "photo"}</span>}
+                {item.kind === "video" && i > 0 && <span className="absolute left-2 top-2 rounded-full bg-orange px-2.5 py-1 text-[11px] font-semibold text-navy">Video</span>}
                 <button
                   type="button"
                   onClick={() => onChange(media.filter((_, j) => j !== i))}
-                  aria-label="Remove photo"
+                  aria-label={item.kind === "video" ? "Remove video" : "Remove photo"}
                   className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-red-700 shadow transition hover:bg-white"
                 >
                   <Icon name="close" className="h-4 w-4" />
                 </button>
               </div>
               <div className="space-y-2 p-2.5">
-                <input value={item.alt} onChange={(event) => update(i, { alt: event.target.value })} className={inputClass} placeholder="What does the photo show? (required)" />
+                {item.original && (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={item.enhance}
+                    onClick={() => update(i, { enhance: !item.enhance })}
+                    className="flex w-full items-center gap-3 rounded-xl bg-orange/10 px-3 py-2 text-left text-xs text-navy"
+                  >
+                    <span className={`relative h-5 w-9 flex-none rounded-full transition-colors ${item.enhance ? "bg-orange" : "bg-navy/20"}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${item.enhance ? "left-[1.125rem]" : "left-0.5"}`} />
+                    </span>
+                    <span>
+                      <span className="block font-semibold">Auto-enhance {item.enhance ? "on" : "off"}</span>
+                      <span className="text-navy/55">Brightness, contrast and colour. Tap to compare.</span>
+                    </span>
+                  </button>
+                )}
+                <input
+                  value={item.alt}
+                  onChange={(event) => update(i, { alt: event.target.value })}
+                  className={inputClass}
+                  placeholder={item.kind === "video" ? "What does the video show? (optional)" : "What does the photo show? (required)"}
+                />
                 {!single && <input value={item.caption} onChange={(event) => update(i, { caption: event.target.value })} className={inputClass} placeholder="Caption (optional)" />}
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
-        {media.length < limit && (
-          <label
-            className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-navy/20 bg-[#f7f9fb] px-4 py-8 text-center transition hover:border-orange hover:bg-orange/5 ${busy ? "opacity-60" : ""}`}
-          >
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple={!single} onChange={add} disabled={busy} className="sr-only" />
+        {room > 0 && (
+          <label className={`${tile} ${busy ? "opacity-60" : ""}`}>
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple={!single} onChange={addPhotos} disabled={busy} className="sr-only" />
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-orange shadow-sm">
               <Icon name="photo" className="h-6 w-6" />
             </span>
             <span className="font-semibold text-navy">{busy ? "Preparing photos…" : single ? "Add a cover photo" : "Add photos"}</span>
-            <span className="text-xs text-navy/50">From your phone or computer · resized automatically</span>
+            <span className="text-xs text-navy/50">From your phone or computer · resized and enhanced automatically</span>
           </label>
         )}
+        {allowVideo && room > 0 && (
+          <div className={`${tile} cursor-default gap-3`}>
+            <label className="flex cursor-pointer flex-col items-center gap-2">
+              <input type="file" accept={VIDEO_TYPES} onChange={addVideo} className="sr-only" />
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-orange shadow-sm">
+                <Icon name="play" className="h-6 w-6" />
+              </span>
+              <span className="font-semibold text-navy">Add a video</span>
+              <span className="text-xs text-navy/50">MP4 or MOV, up to {MAX_VIDEO_MB} MB</span>
+            </label>
+            <span className="text-xs font-semibold uppercase tracking-widest text-navy/35">or</span>
+            <div className="flex w-full max-w-xs gap-2">
+              <input
+                type="url"
+                inputMode="url"
+                value={link}
+                onChange={(event) => setLink(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addLink())}
+                className={`${inputClass} py-2`}
+                placeholder="YouTube or Vimeo link"
+                aria-label="YouTube or Vimeo link"
+              />
+              <button type="button" onClick={addLink} className="flex-none rounded-2xl bg-navy px-4 text-sm font-semibold text-white">
+                Add
+              </button>
+            </div>
+            {linkError && <p className="text-xs text-red-700">{linkError}</p>}
+          </div>
+        )}
       </div>
+      {fileError && <p className="mt-3 rounded-2xl bg-red-50 px-4 py-2 text-sm text-red-800">{fileError}</p>}
       <p className="mt-3 flex items-center gap-2 text-xs text-navy/50">
         <Icon name="shield" className="h-3.5 w-3.5 flex-none text-orange" />
-        Only genuine photos from JD Mining Consulting&apos;s own work.
+        Only genuine photos and videos from JD Mining Consulting&apos;s own work.
       </p>
     </div>
   );
@@ -394,8 +544,12 @@ function Preview({ type, form, services }) {
   return (
     <div className="overflow-hidden rounded-[1.75rem] bg-white shadow-[0_30px_60px_-35px_rgba(14,41,62,0.55)]">
       <div className="relative aspect-[16/10] bg-[#eef2f6]">
-        {photo ? (
-          <img src={photo.preview ?? photo.src} alt="" className="h-full w-full object-cover" />
+        {photo?.kind === "image" ? (
+          <img src={previewOf(photo)} alt="" className="h-full w-full object-cover" />
+        ) : photo ? (
+          <div className="grid h-full place-items-center bg-navy text-orange">
+            <Icon name="play" className="h-12 w-12" />
+          </div>
         ) : (
           <div className="grid h-full place-items-center text-navy/25">
             <Icon name="photo" className="h-10 w-10" />
@@ -425,13 +579,13 @@ function Preview({ type, form, services }) {
   );
 }
 
-function Editor({ type, entry, keyValue, onDone, onCancel }) {
+function Editor({ type, entry, uploads, onDone, onCancel, onSignedOut }) {
   const [form, setForm] = useState(() => toForm(type, entry));
   const [translations, setTranslations] = useState(() => {
     const f = toForm(type, entry);
     return [f.name, f.description, f.title, f.summary].some((value) => value && OTHER_LANGS.some((lang) => value[lang]));
   });
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(null);
   const [error, setError] = useState(null);
   const set = (key) => (value) => setForm((current) => ({ ...current, [key]: value }));
   const setInput = (key) => (event) => set(key)(event.target.type === "checkbox" ? event.target.checked : event.target.value);
@@ -446,18 +600,25 @@ function Editor({ type, entry, keyValue, onDone, onCancel }) {
       if (!form.service) local.push("Choose the service provided.");
       if (form.client.trim() && !form.clientPermission) local.push("Tick the box confirming the client has agreed to be named, or leave the client empty.");
     } else if (!form.category) local.push("Choose a category.");
-    if (form.media.some((item) => !item.alt.trim())) local.push("Describe every photo in a few words.");
+    if (form.media.some((item) => item.kind === "image" && !item.alt.trim())) local.push("Describe every photo in a few words.");
     if (local.length) return setError({ message: "Almost there. Please check:", problems: local });
 
-    setSaving(true);
+    const pending = form.media.filter(isNew);
+    const uploaded = new Map();
     try {
-      const { entry: payload, uploads } = toRequest(type, form);
-      await api(keyValue, "POST", { action: "save", type, entry: payload, uploads });
+      for (const [n, item] of pending.entries()) {
+        const label = `Uploading ${item.kind === "video" ? "video" : "photo"} ${n + 1} of ${pending.length}`;
+        setSaving(label);
+        uploaded.set(item, await uploadFile(item, type, uploads, (percent) => setSaving(`${label} · ${Math.round(percent)}%`)));
+      }
+      setSaving("Publishing…");
+      await api("/api/content", "POST", { action: "save", type, entry: toRequest(type, form, uploaded) });
       onDone(form.id ? "Changes saved." : "Published.");
     } catch (failure) {
+      if (failure.status === 401) return onSignedOut();
       setError({ message: failure.message, problems: failure.problems?.map((problem) => problem.replace(/^[^:]+: /, "")) });
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   }
 
@@ -486,7 +647,7 @@ function Editor({ type, entry, keyValue, onDone, onCancel }) {
         <div className="space-y-4">
           <Toggle checked={translations} onChange={setTranslations}>
             <span>
-              <span className="block font-semibold">Also write French & Kinyarwanda</span>
+              <span className="block font-semibold">Also write French, Kinyarwanda & Swahili</span>
               <span className="text-xs text-navy/55">Optional. Without it, the English text shows in every language.</span>
             </span>
           </Toggle>
@@ -568,8 +729,8 @@ function Editor({ type, entry, keyValue, onDone, onCancel }) {
                 </div>
               </Section>
 
-              <Section number={4} title="Photos" hint="The first photo is the main one.">
-                <Photos media={form.media} onChange={set("media")} />
+              <Section number={4} title="Photos & videos" hint="The first one is the main image. Video highlights are welcome.">
+                <Media media={form.media} onChange={set("media")} allowVideo />
               </Section>
             </>
           ) : (
@@ -595,7 +756,7 @@ function Editor({ type, entry, keyValue, onDone, onCancel }) {
               </Section>
 
               <Section number={3} title="Cover photo" hint="Optional.">
-                <Photos media={form.media} onChange={set("media")} single />
+                <Media media={form.media} onChange={set("media")} single />
               </Section>
             </>
           )}
@@ -635,10 +796,10 @@ function Editor({ type, entry, keyValue, onDone, onCancel }) {
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={Boolean(saving)}
               className="group flex flex-1 items-center justify-center gap-3 rounded-full bg-navy py-3 font-display font-semibold text-white transition hover:bg-navy-light disabled:opacity-60"
             >
-              {saving ? "Saving…" : form.id ? "Save changes" : "Publish"}
+              {saving ?? (form.id ? "Save changes" : "Publish")}
               {!saving && (
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-orange text-navy transition-transform group-hover:-rotate-45">
                   <Icon name="arrow" className="h-3.5 w-3.5" />
@@ -670,7 +831,11 @@ function EntryCard({ type, entry, onEdit, onDelete, deleting, services }) {
     >
       <div className="flex gap-4 p-3 sm:p-4">
         <div className="h-24 w-24 flex-none overflow-hidden rounded-2xl bg-[#eef2f6] sm:h-28 sm:w-36">
-          {photo ? (
+          {photo?.type === "video" ? (
+            <div className="grid h-full place-items-center bg-navy text-orange">
+              <Icon name="play" className="h-8 w-8" />
+            </div>
+          ) : photo ? (
             <img src={photo.src} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="grid h-full place-items-center text-navy/25">
@@ -737,7 +902,7 @@ const RULES = [
   "Publish only real, documented work.",
   "Name a client only with their written permission.",
   "Report results only when you have evidence.",
-  "Use only genuine photos of your own work.",
+  "Use only genuine photos and videos of your own work.",
 ];
 
 function Toast({ notice, onClose }) {
@@ -771,8 +936,106 @@ function Toast({ notice, onClose }) {
   );
 }
 
+// Sign in, create the administrator account, or set a new password with the setup code.
+function SignIn({ onSignedIn }) {
+  const [mode, setMode] = useState("login");
+  const [form, setForm] = useState({ name: "", email: "", password: "", code: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const setInput = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  const creating = mode !== "login";
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await api("/api/auth", "POST", creating ? { action: "signup", ...form } : { action: "login", email: form.email, password: form.password });
+      onSignedIn(data.user, data.reset ? "Your new password is set." : creating ? "Your administrator account is ready." : null);
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const titles = {
+    login: ["Sign in", "Administrators only. Visitors don't need an account."],
+    signup: ["Create the administrator account", "You need the setup code from your developer."],
+    reset: ["Set a new password", "Enter your email, a new password and the setup code from your developer."],
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease }} className="mx-auto max-w-md">
+      <form onSubmit={submit} className="rounded-[1.75rem] bg-white p-6 shadow-[0_30px_60px_-35px_rgba(14,41,62,0.55)] sm:p-8">
+        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-navy text-orange">
+          <Icon name={creating ? "user" : "shield"} className="h-6 w-6" />
+        </span>
+        <h2 className="mt-4 font-display text-2xl font-bold">{titles[mode][0]}</h2>
+        <p className="mt-1 text-sm text-navy/55">{titles[mode][1]}</p>
+
+        <div className="mt-6 space-y-4">
+          {mode === "signup" && (
+            <Field label="Your name">
+              <input value={form.name} onChange={setInput("name")} autoComplete="name" className={inputClass} />
+            </Field>
+          )}
+          <Field label="Email">
+            <input type="email" required value={form.email} onChange={setInput("email")} autoComplete="username" className={inputClass} />
+          </Field>
+          <Field label={creating ? "New password" : "Password"} hint={creating ? "At least 10 characters." : undefined}>
+            <input type="password" required minLength={creating ? 10 : undefined} value={form.password} onChange={setInput("password")} autoComplete={creating ? "new-password" : "current-password"} className={inputClass} />
+          </Field>
+          {creating && (
+            <Field label="Setup code">
+              <input required value={form.code} onChange={setInput("code")} autoComplete="off" spellCheck={false} className={inputClass} />
+            </Field>
+          )}
+        </div>
+
+        {error && (
+          <p role="alert" className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="group mt-6 flex w-full items-center justify-center gap-3 rounded-full bg-navy py-3 font-display font-semibold text-white transition hover:bg-navy-light disabled:opacity-60"
+        >
+          {busy ? "Please wait…" : creating ? (mode === "reset" ? "Set password and sign in" : "Create account") : "Sign in"}
+          {!busy && (
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-orange text-navy transition-transform group-hover:-rotate-45">
+              <Icon name="arrow" className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </button>
+
+        <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
+          {mode === "login" ? (
+            <>
+              <button type="button" onClick={() => setMode("signup")} className="font-semibold text-orange">
+                Create an account
+              </button>
+              <button type="button" onClick={() => setMode("reset")} className="font-semibold text-navy/55 hover:text-navy">
+                Forgot your password?
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setMode("login")} className="font-semibold text-orange">
+              Back to sign in
+            </button>
+          )}
+        </div>
+      </form>
+    </motion.div>
+  );
+}
+
 export default function Admin() {
-  const [keyValue] = useState(readKey);
+  const [auth, setAuth] = useState(null);
+  const [authError, setAuthError] = useState(null);
   const [tab, setTab] = useState("projects");
   const [content, setContent] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -780,6 +1043,7 @@ export default function Admin() {
   const [notice, setNotice] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const closeNotice = useCallback(() => setNotice(null), []);
+  const user = auth?.user;
 
   useEffect(() => {
     document.title = "Website editor · JD Mining Consulting";
@@ -790,37 +1054,57 @@ export default function Admin() {
     return () => robots.remove();
   }, []);
 
+  useEffect(() => {
+    api("/api/auth")
+      .then(setAuth)
+      .catch((failure) => setAuthError(failure.message));
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      setContent(await getContent(keyValue));
+      setContent(await getContent());
       setLoadError(null);
     } catch (failure) {
       setLoadError(failure.message);
     }
-  }, [keyValue]);
+  }, []);
 
   useEffect(() => {
-    if (!keyValue) return undefined;
+    if (!user) return undefined;
     let active = true;
-    getContent(keyValue)
+    getContent()
       .then((data) => active && setContent(data))
       .catch((failure) => active && setLoadError(failure.message));
     return () => {
       active = false;
     };
-  }, [keyValue]);
+  }, [user]);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [editing]);
 
+  const signedOut = useCallback(() => {
+    setAuth((current) => ({ ...current, user: null }));
+    setEditing(null);
+    setNotice({ text: "Your session ended. Please sign in again.", tone: "error" });
+  }, []);
+
+  async function signOut() {
+    await api("/api/auth", "POST", { action: "logout" }).catch(() => {});
+    setAuth((current) => ({ ...current, user: null }));
+    setContent(null);
+    setEditing(null);
+  }
+
   async function remove(id) {
     setDeleting(id);
     try {
-      await api(keyValue, "POST", { action: "delete", type: tab, id });
-      setNotice({ text: "Deleted. The website updates in about a minute." });
+      await api("/api/content", "POST", { action: "delete", type: tab, id });
+      setNotice({ text: "Deleted. It's gone from the website now." });
       await load();
     } catch (failure) {
+      if (failure.status === 401) return signedOut();
       setNotice({ text: failure.message, tone: "error" });
     } finally {
       setDeleting(null);
@@ -840,32 +1124,52 @@ export default function Admin() {
             <Logo tone="white" showName={false} />
             <div>
               <p className="font-display font-bold leading-tight">Website editor</p>
-              <p className="text-xs text-white/55">JD Mining Consulting</p>
+              <p className="text-xs text-white/55">{user ? user.name : "JD Mining Consulting"}</p>
             </div>
           </div>
-          <Link to="/" className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold backdrop-blur transition hover:bg-white/20">
-            View website <Icon name="arrow" className="h-3.5 w-3.5 text-orange" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/" aria-label="View website" className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold backdrop-blur transition hover:bg-white/20">
+              <span className="hidden sm:inline">View website</span> <Icon name="arrow" className="h-3.5 w-3.5 text-orange" />
+            </Link>
+            {user && (
+              <button type="button" onClick={signOut} aria-label="Sign out" className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold backdrop-blur transition hover:bg-white/20">
+                <Icon name="logout" className="h-4 w-4 text-orange" /> <span className="hidden sm:inline">Sign out</span>
+              </button>
+            )}
+          </div>
         </div>
-        {!editing && keyValue && (
+        {!editing && user && (
           <div className="relative mx-auto max-w-5xl px-4 pb-20 pt-6 sm:pt-10">
             <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease }} className="font-display text-3xl font-bold sm:text-4xl">
               What would you like to publish?
             </motion.h1>
-            <p className="mt-2 max-w-lg text-sm text-white/60">Add, edit or delete projects and news. Changes appear on the website about a minute after you save.</p>
+            <p className="mt-2 max-w-lg text-sm text-white/60">Add, edit or delete projects and news. Changes are live on the website as soon as you save.</p>
           </div>
         )}
       </header>
 
-      <main className={`relative mx-auto max-w-5xl px-4 pb-16 ${editing || !keyValue ? "pt-6" : "-mt-12"}`}>
-        {!keyValue ? (
+      <main className={`relative mx-auto max-w-5xl px-4 pb-16 ${editing || !user ? "pt-8" : "-mt-12"}`}>
+        {authError ? (
+          <div className="mx-auto max-w-md rounded-[1.75rem] bg-white p-8 text-center text-sm shadow-sm">
+            <p className="font-semibold text-red-800">{authError}</p>
+          </div>
+        ) : !auth ? (
+          <div className="mx-auto h-80 max-w-md animate-pulse rounded-[1.75rem] bg-white/70" />
+        ) : !auth.ready ? (
           <div className="mx-auto max-w-md rounded-[1.75rem] bg-white p-8 text-center shadow-sm">
             <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-navy text-orange">
               <Icon name="shield" className="h-7 w-7" />
             </span>
-            <p className="mt-4 font-display text-xl font-bold">This page needs your private link</p>
-            <p className="mt-2 text-sm text-navy/60">Open the editor link you were given (it ends with #key=…). After that, this browser remembers it.</p>
+            <p className="mt-4 font-display text-xl font-bold">The editor is not set up yet</p>
+            <p className="mt-2 text-sm text-navy/60">Your developer needs to connect the content database and photo storage in Vercel. Nothing else is needed from you.</p>
           </div>
+        ) : !user ? (
+          <SignIn
+            onSignedIn={(signedIn, message) => {
+              setAuth((current) => ({ ...current, user: signedIn }));
+              if (message) setNotice({ text: message });
+            }}
+          />
         ) : (
           <AnimatePresence mode="wait">
             {editing ? (
@@ -873,11 +1177,12 @@ export default function Admin() {
                 key={editing.entry?.id ?? "new"}
                 type={tab}
                 entry={editing.entry}
-                keyValue={keyValue}
+                uploads={auth.uploads}
                 onCancel={() => setEditing(null)}
+                onSignedOut={signedOut}
                 onDone={(message) => {
                   setEditing(null);
-                  setNotice({ text: `${message} The website updates in about a minute.` });
+                  setNotice({ text: `${message} It's live on the website now.` });
                   load();
                 }}
               />
@@ -980,7 +1285,7 @@ export default function Admin() {
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-5 border-t border-white/10 pt-4 text-xs text-white/45">Keep this link private. Anyone who has it can publish on the website.</p>
+                    <p className="mt-5 border-t border-white/10 pt-4 text-xs text-white/45">On a shared computer, sign out when you finish.</p>
                   </aside>
                 </div>
               </motion.div>

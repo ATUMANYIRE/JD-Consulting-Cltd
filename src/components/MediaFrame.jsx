@@ -1,5 +1,14 @@
 import { CameraIcon } from "./icons";
 
+// YouTube and Vimeo links play in their own privacy-friendly embed; any other video is a file.
+function embedUrl(src) {
+  const youtube = src.match(/^https:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/);
+  if (youtube) return `https://www.youtube-nocookie.com/embed/${youtube[1]}`;
+  const vimeo = src.match(/^https:\/\/(?:www\.)?vimeo\.com\/(\d+)/);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}?dnt=1`;
+  return null;
+}
+
 // One photo or video slot. Pass { type: "image" | "video", src, alt, poster, caption } once the
 // company supplies genuine media; without a src it renders a clearly labelled placeholder.
 export default function MediaFrame({ media, label, aspect = "aspect-[4/3]", rounded = "rounded-3xl", className = "" }) {
@@ -30,8 +39,17 @@ export default function MediaFrame({ media, label, aspect = "aspect-[4/3]", roun
   return (
     <figure className={className}>
       <div className={`relative overflow-hidden ${rounded} ${aspect} bg-navy`}>
-        {media.type === "video" ? (
-          <video src={media.src} poster={media.poster} controls preload="metadata" className="h-full w-full object-cover" />
+        {media.type === "video" && embedUrl(media.src) ? (
+          <iframe
+            src={embedUrl(media.src)}
+            title={media.alt || media.caption || "Video"}
+            loading="lazy"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            className="h-full w-full"
+          />
+        ) : media.type === "video" ? (
+          <video src={media.src} poster={media.poster} controls playsInline preload="metadata" className="h-full w-full object-cover" />
         ) : (
           <img src={media.src} alt={media.alt ?? ""} loading="lazy" className="h-full w-full object-cover" />
         )}

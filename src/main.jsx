@@ -13,7 +13,10 @@ import Projects from "./pages/Projects.jsx";
 import Updates from "./pages/Updates.jsx";
 import Careers from "./pages/Careers.jsx";
 import Admin from "./pages/Admin.jsx";
+import { loadLiveContent } from "./lib/liveContent";
 import "./index.css";
+
+loadLiveContent();
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

@@ -1,73 +1,68 @@
 # Adding content to the website
 
-## For the owner: the private editor
+## For the owner: the website editor
 
-The owner adds and edits **projects** and **updates & news** from a private page, on a phone or
-a computer. There is no account, password or sign-up: the private link is the key.
+The owner adds and edits **projects** and **industry updates** at `https://<website>/admin`, on a
+phone or a computer. Only administrators sign in; visitors never need an account.
 
-1. Open the private link (it looks like `https://<website>/admin#key=…`). Save it as a bookmark
-   or add it to the phone's home screen. After the first visit, the browser remembers it.
-2. Choose **Projects** or **Updates & news**, then **+ New project** / **+ New update**. Use
-   **Edit** or **Delete** on anything already published.
-3. Fill in the form, add photos (they are resized automatically), and press **Publish**.
-4. The website shows the change about **one minute** later.
+1. **First time:** open `/admin`, choose **Create an account**, and enter your name, email, a
+   password (at least 10 characters) and the **setup code** your developer gives you.
+2. **After that:** sign in with your email and password. The browser stays signed in for 30 days,
+   or until you press **Sign out**.
+3. Choose **Projects** or **Updates & news**, then **Add a new project / update**. Use **Edit** or
+   **Delete** on anything already published.
+4. Fill in the form and add photos. They are resized automatically, and **Auto-enhance** improves
+   brightness, contrast and colour (switch it off on any photo to keep the original). Projects can
+   also have **videos**: a file up to 250 MB, or a YouTube or Vimeo link.
+5. Press **Publish**. The change is **live on the website immediately**.
 
-Rules the editor reminds you of: publish only real, documented work; name a client only with
-their written permission; report results only when you have evidence; use only genuine photos of
-JD Mining Consulting's own work.
+**Forgot your password?** Choose **Forgot your password?** on the sign-in page and set a new one with
+the setup code. The same code lets you add another administrator.
 
-Keep the link private, like a password. Anyone who has it can publish on the website. If it is
-lost or shared by mistake, ask the developer for a new one; the old link then stops working.
+Rules the editor reminds you of: publish only real, documented work; name a client only with their
+written permission; report results only when you have evidence; use only genuine photos and videos
+of JD Mining Consulting's own work.
 
-## For the developer: one-time setup
+## For the developer: one-time setup in Vercel
 
-The editor (`/admin`) talks to a Vercel serverless function (`api/content.js`). Each save becomes
-one commit in this repository (the entry in `src/content/*.json`, plus photos in `public/media/`),
-and Vercel redeploys from it. Nothing is stored anywhere else.
+The editor uses two storage services that Vercel adds to the project in a few clicks. Both have free
+tiers that are ample for this site.
 
-1. **Create the private key** (any long random text):
+1. **Content database (Upstash Redis).** Vercel → the project → **Storage** → **Create** →
+   **Upstash for Redis** (Marketplace) → free plan → connect it to the project for all environments.
+   This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+2. **Photo and video storage (Vercel Blob).** Vercel → **Storage** → **Create** → **Blob**, with
+   **public** access → connect it to the project. This adds `BLOB_READ_WRITE_TOKEN`. The free tier
+   includes 1 GB, so encourage YouTube links for long videos.
+3. **Setup code.** Create a long random code:
 
    ```bash
-   node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+   node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"
    ```
 
-2. **Create a GitHub token** the function can commit with. On GitHub, go to Settings → Developer
-   settings → Personal access tokens → Fine-grained tokens → Generate new token:
-   - Repository access: only `ATUMANYIRE/JD-Consulting-Cltd`
-   - Permissions: **Contents: Read and write** (nothing else)
-   - Expiration: up to one year. Set a reminder to renew it: when it expires, saves fail until
-     a new token is added.
+   and add it in Vercel → Settings → Environment Variables as `ADMIN_SETUP_CODE` (Production).
+4. **Redeploy**, then send the owner the `/admin` address and, separately, the setup code.
 
-3. **Add environment variables in Vercel** (Project → Settings → Environment Variables,
-   Production), then redeploy:
+**To change the setup code:** edit `ADMIN_SETUP_CODE` in Vercel and redeploy. Existing accounts keep
+working; the new code is only needed to create an account or reset a password.
 
-   | Name | Value |
-   | --- | --- |
-   | `ADMIN_KEY` | the key from step 1 |
-   | `GITHUB_TOKEN` | the token from step 2 |
-   | `GITHUB_REPO` | `ATUMANYIRE/JD-Consulting-Cltd` |
-   | `GITHUB_BRANCH` | `main` (the branch Vercel deploys) |
+The old private-link variables (`ADMIN_KEY`, `GITHUB_TOKEN`, `GITHUB_REPO`, `GITHUB_BRANCH`) are no
+longer used and can be deleted from Vercel.
 
-4. **Send the owner the private link**: `https://<website domain>/admin#key=<ADMIN_KEY>`.
-   The key sits after `#`, so it is never sent to the server in the address or stored in logs; the
-   editor sends it in a request header instead.
+**How it works:** saves go to Redis and the website reads them through `GET /api/content`, so
+there is no rebuild. Photos and videos go straight from the browser to Blob storage. Deleting an
+entry also deletes the files only it used.
 
-**To revoke a link:** change `ADMIN_KEY` in Vercel, redeploy, and send the new link.
-
-**Your own code changes:** the editor commits to `main`, so run `git pull` before you push, or
-your push will be rejected. Every owner edit appears in the Git history ("Website editor: add
-project …") and can be reverted like any commit.
-
-**Trying the editor on your own computer:** run `npm run dev` and open
-`http://localhost:5173/admin#key=local-test-key-only`. In this mode saves are written straight to
-`src/content/*.json` and `public/media/` in your working copy (nothing goes to GitHub), and the
-site updates instantly. Review or discard the test entries with `git status` before you commit.
-`vite preview` has no editor server; `vercel dev` runs the real GitHub-backed function.
+**Trying the editor on your own computer:** run `npm run dev`, open `http://localhost:5173/admin`
+and create an account with the setup code `local-setup-code`. Accounts and content are kept in
+`.local-admin/store.json` and photos in `public/media/` (both ignored by Git or safe to delete).
+`vite preview` has no editor server.
 
 ## Editing content by hand (developer)
 
-Projects and updates are plain JSON lists in `src/content/projects.json` and
-`src/content/updates.json`, newest first. Vacancies, the founder profile and company details
+Projects and updates live in the database and are managed in `/admin`. The JSON lists in
+`src/content/projects.json` and `src/content/updates.json` are only the built-in fallback shown if
+the database can't be reached. Vacancies, the founder profile and company details
 (TIN, address, logo) are in `src/data/careers.js`, `src/data/profile.js` and `src/data/company.js`;
 the format of each entry is described at the top of each file.
 

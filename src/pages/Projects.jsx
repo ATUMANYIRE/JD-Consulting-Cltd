@@ -8,7 +8,7 @@ import { Reveal, Stagger } from "../components/motion";
 import { staggerItem } from "../components/variants";
 import { ServiceIllustration } from "../components/illustrations";
 import { localize, useLanguage, useServices } from "../i18n/context";
-import { projects } from "../data/projects";
+import { useLiveContent } from "../lib/liveContent";
 import { projectStatuses } from "../data/schema";
 
 function ProjectCard({ project }) {
@@ -98,6 +98,7 @@ function StatusTabs({ status, onChange, counts }) {
 }
 
 export default function Projects() {
+  const { projects } = useLiveContent();
   const { t } = useLanguage();
   const counts = Object.fromEntries(projectStatuses.map((value) => [value, projects.filter((project) => project.status === value).length]));
   const [status, setStatus] = useState(counts.ongoing > 0 || counts.completed === 0 ? "ongoing" : "completed");

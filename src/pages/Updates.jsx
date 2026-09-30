@@ -7,7 +7,8 @@ import { Reveal, Stagger } from "../components/motion";
 import { staggerItem } from "../components/variants";
 import { ServiceIllustration } from "../components/illustrations";
 import { formatDate, localize, useLanguage } from "../i18n/context";
-import { updateCategories, updates } from "../data/updates";
+import { updateCategories } from "../data/updates";
+import { useLiveContent } from "../lib/liveContent";
 
 function UpdateCard({ item }) {
   const { t, lang } = useLanguage();
@@ -35,6 +36,7 @@ function UpdateCard({ item }) {
 }
 
 export default function Updates() {
+  const { updates } = useLiveContent();
   const { t } = useLanguage();
   const [category, setCategory] = useState("all");
   const counts = Object.fromEntries(updateCategories.map((key) => [key, updates.filter((item) => item.category === key).length]));

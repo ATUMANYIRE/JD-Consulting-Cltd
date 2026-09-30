@@ -1,6 +1,7 @@
-// Company updates and insights, newest first. The owner adds and edits them from the private
-// /admin page, which saves to src/content/updates.json; you can also edit that file by hand (see
-// CONTENT.md). Text fields take a plain string or { en, fr, rw }.
+// Company updates and insights, newest first. The owner manages them in /admin, which saves to
+// the content database; pages read the live list through src/lib/liveContent.js. This bundled
+// list (src/content/updates.json) is only the fallback shown while that loads or if it fails.
+// Text fields take a plain string or { en, fr, rw, sw }.
 //
 // {
 //   id: "unique-slug",

@@ -1,7 +1,7 @@
 import { company, phoneHref, whatsappHref } from "../data/company";
 import { serviceSlugs } from "../data/services";
 import { vacancies } from "../data/careers";
-import { projects } from "../data/projects";
+import { getLiveContent } from "./liveContent";
 
 // Rule-based assistant: it recognizes what a visitor is asking about (English, French,
 // Kinyarwanda or Swahili keywords) and answers only from the site's own published content. Anything it
@@ -122,7 +122,7 @@ export function buildReply(intent, t, question) {
     case "careers":
       return { text: vacancies.length ? r.careersOpen : r.careers, links: [{ label: a.links.careers, to: "/careers" }] };
     case "projects":
-      return { text: projects.length ? r.projectsOpen : r.projects, links: [{ label: a.links.projects, to: "/projects" }, { label: a.links.services, to: "/services" }] };
+      return { text: getLiveContent().projects.length ? r.projectsOpen : r.projects, links: [{ label: a.links.projects, to: "/projects" }, { label: a.links.services, to: "/services" }] };
     case "minerals":
       return { text: r.minerals, list: t.home.minerals, extra: `${t.home.standardsLabel}: ${t.home.standards.join(" · ")}` };
     case "sectors":
