@@ -58,7 +58,7 @@ export default function Logo({ tone = "navy", size = "md", showName = true, clas
     <span className={`flex items-center gap-2.5 ${className}`}>
       <span className="transition-transform group-hover:-rotate-6">{mark}</span>
       {showName && (
-        <span className={`font-display font-bold leading-[1.05] tracking-tight ${TONES[tone].text} ${size === "lg" ? "text-xl" : "max-w-[7rem] text-[15px] sm:max-w-none sm:text-lg"}`}>
+        <span className={`font-display font-bold leading-[1.05] tracking-tight ${TONES[tone].text} ${size === "lg" ? "text-xl" : "max-w-[7rem] text-[15px] sm:max-w-none sm:text-lg lg:max-w-[8rem] lg:text-base xl:max-w-none xl:text-lg"}`}>
           {company.name}
         </span>
       )}

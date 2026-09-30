@@ -39,14 +39,14 @@ export default function Navbar() {
             <Logo />
           </Link>
 
-          <div className="hidden items-center xl:flex">
+          <div className="hidden items-center lg:flex">
             {links.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
                 end={link.to === "/"}
                 className={({ isActive }) =>
-                  `group relative px-3 py-2 whitespace-nowrap text-sm font-semibold transition-colors ${isActive ? "text-navy" : "text-navy/55 hover:text-navy"}`
+                  `group relative px-2 py-2 whitespace-nowrap text-[13px] font-semibold xl:px-3 xl:text-sm transition-colors ${isActive ? "text-navy" : "text-navy/55 hover:text-navy"}`
                 }
               >
                 {({ isActive }) => (
@@ -67,7 +67,7 @@ export default function Navbar() {
             <LanguageSwitcher className="hidden md:flex" />
             <Link
               to="/contact"
-              className="group hidden items-center gap-3 whitespace-nowrap rounded-full bg-navy py-1.5 pl-5 pr-1.5 text-sm font-semibold text-white transition-colors hover:bg-navy-light sm:flex"
+              className="group hidden items-center gap-3 whitespace-nowrap rounded-full bg-navy py-1.5 pl-5 pr-1.5 text-sm lg:gap-2 lg:pl-4 xl:gap-3 xl:pl-5 font-semibold text-white transition-colors hover:bg-navy-light sm:flex"
             >
               {t.nav.cta}
               <span className="grid h-8 w-8 place-items-center rounded-full bg-orange text-navy transition-transform group-hover:rotate-[-45deg]">→</span>
@@ -78,7 +78,7 @@ export default function Navbar() {
               aria-controls="mobile-menu"
               aria-label={t.nav.menu}
               onClick={() => setOpen(true)}
-              className="grid h-11 w-11 place-items-center rounded-xl bg-navy xl:hidden"
+              className="grid h-11 w-11 place-items-center rounded-xl bg-navy lg:hidden"
             >
               <span className="flex flex-col items-end gap-1.5">
                 <span className="h-0.5 w-5 rounded bg-white" />
@@ -96,7 +96,7 @@ export default function Navbar() {
             role="dialog"
             aria-modal="true"
             aria-label={t.nav.menu}
-            className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-navy px-6 pb-8 pt-5 text-white xl:hidden"
+            className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-navy px-6 pb-8 pt-5 text-white lg:hidden"
             initial={{ clipPath: "circle(0% at 100% 0%)" }}
             animate={{ clipPath: "circle(150% at 100% 0%)" }}
             exit={{ clipPath: "circle(0% at 100% 0%)" }}
