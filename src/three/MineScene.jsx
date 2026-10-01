@@ -28,11 +28,11 @@ function Supervisor() {
     const glance = (Math.sin(t * 0.3) + 1) / 2;
     spine.current.rotation.x = 0.05 + glance * 0.12 + Math.sin(t * 1.4) * 0.01;
     spine.current.rotation.y = Math.sin(t * 0.35) * 0.3 * (1 - glance);
-    arms.current.rotation.x = -0.95 + Math.sin(t * 1.4) * 0.015;
+    arms.current.rotation.x = -0.06 + Math.sin(t * 1.4) * 0.015;
   });
   return (
     <Shadowed cast receive={false} position={[-1.35, 0, -4.2]} rotation={[0, 0.7, 0]}>
-      <MinerFigure spineRef={spine} armsRef={arms} tool={<Tablet />}>
+      <MinerFigure spineRef={spine} armsRef={arms} arms="hold" tool={<Tablet />}>
         <GasDetector />
       </MinerFigure>
     </Shadowed>

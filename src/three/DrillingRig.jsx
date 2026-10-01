@@ -286,7 +286,7 @@ export default function DrillingRig({ rockRef }) {
     <>
       <group ref={rig} position={RIG_POSITION} rotation={RIG_ROTATION}>
         <Shadowed cast receive={false} position={OPERATOR.position} rotation={[0, OPERATOR.yaw, 0]}>
-          <MinerFigure spineRef={spine} armsRef={arms} lampShadow beam earMuffs respirator />
+          <MinerFigure spineRef={spine} armsRef={arms} stance="brace" arms="reach" lampShadow beam earMuffs respirator />
         </Shadowed>
         <Shadowed cast receive={false}>
           <group ref={drill} position={PIVOT}>
